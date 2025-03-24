@@ -50,29 +50,23 @@ const props = defineProps<{
 
 defineEmits(['view-details']);
 
-// Process events to add highlight property
 const sortedAndHighlightedEvents = computed(() => {
   if (!props.events.length) return [];
   
-  // Find special events to highlight
   const today = new Date();
   
-  // Find earliest event
   const sortedByDate = [...props.events].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
   const earliestEvent = sortedByDate[0];
   
-  // Find latest event
   const latestEvent = sortedByDate[sortedByDate.length - 1];
   
-  // Find event with longest description
   const longestDescription = props.events.reduce((longest, current) => 
     (current.description.length > longest.description.length) ? current : longest, 
     props.events[0]
   );
   
-  // Find closest upcoming event
   const upcomingEvents = props.events.filter(e => new Date(e.date) >= today);
   const closestUpcoming = upcomingEvents.length ? 
     upcomingEvents.reduce((closest, current) => {
@@ -81,7 +75,7 @@ const sortedAndHighlightedEvents = computed(() => {
       return currentTime < closestTime ? current : closest;
     }, upcomingEvents[0]) : null;
   
-  // Map events to add highlight property
+  // events to add highlight property
   return props.events.map(event => {
     let highlight = '';
     

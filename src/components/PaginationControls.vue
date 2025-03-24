@@ -4,9 +4,9 @@
       <!-- First page button -->
       <button 
         @click="changePage(1)" 
-        :disabled="currentPage === 1"
+        :disabled="currentPage === 1 || totalPages === 0"
         class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-        :class="currentPage === 1 
+        :class="currentPage === 1 || totalPages === 0
           ? 'text-[#737373] cursor-not-allowed' 
           : 'text-[#D9D9D9] hover:bg-[#333333]'"
       >
@@ -16,9 +16,9 @@
       <!-- Previous page button -->
       <button 
         @click="changePage(currentPage - 1)" 
-        :disabled="currentPage === 1"
+        :disabled="currentPage === 1 || totalPages === 0"
         class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-        :class="currentPage === 1 
+        :class="currentPage === 1 || totalPages === 0
           ? 'text-[#737373] cursor-not-allowed' 
           : 'text-[#D9D9D9] hover:bg-[#333333]'"
       >
@@ -28,12 +28,12 @@
       <!-- Page numbers -->
       <div class="flex space-x-1">
         <button 
-          v-for="page in displayedPageNumbers" 
+          v-for="page in safeDisplayedPageNumbers" 
           :key="page"
           @click="changePage(page)"
-          class="w-9 h-9 rounded-full flex items-center justify-center transition-colors text-sm"
-          :class="page === currentPage 
-            ? 'bg-[#533673] text-white' 
+          class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
+          :class="currentPage === page 
+            ? 'bg-[#333333] text-white' 
             : 'text-[#D9D9D9] hover:bg-[#333333]'"
         >
           {{ page }}
@@ -43,9 +43,9 @@
       <!-- Next page button -->
       <button 
         @click="changePage(currentPage + 1)" 
-        :disabled="currentPage === totalPages"
+        :disabled="currentPage === totalPages || totalPages === 0"
         class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-        :class="currentPage === totalPages 
+        :class="currentPage === totalPages || totalPages === 0
           ? 'text-[#737373] cursor-not-allowed' 
           : 'text-[#D9D9D9] hover:bg-[#333333]'"
       >
@@ -55,9 +55,9 @@
       <!-- Last page button -->
       <button 
         @click="changePage(totalPages)" 
-        :disabled="currentPage === totalPages"
+        :disabled="currentPage === totalPages || totalPages === 0"
         class="w-9 h-9 rounded-full flex items-center justify-center transition-colors"
-        :class="currentPage === totalPages 
+        :class="currentPage === totalPages || totalPages === 0
           ? 'text-[#737373] cursor-not-allowed' 
           : 'text-[#D9D9D9] hover:bg-[#333333]'"
       >
@@ -81,7 +81,7 @@
     
     <!-- Stats -->
     <div class="ml-4 text-sm text-[#737373]">
-      Showing {{ startItem }}-{{ endItem }} of {{ totalItems }}
+      Showing {{ safeStartItem }}-{{ safeEndItem }} of {{ totalItems }}
     </div>
   </div>
 </template>
@@ -102,22 +102,19 @@ const emit = defineEmits(['page-change', 'items-per-page-change']);
 const selectedItemsPerPage = ref(props.itemsPerPage);
 const itemsPerPageOptions = [9, 12, 15, 24];
 
-// Calculate displayed page numbers
-const displayedPageNumbers = computed(() => {
-  const totalPages = props.totalPages;
-  const currentPage = props.currentPage;
-  const displayCount = 5; // Max number of pages to display
+const safeDisplayedPageNumbers = computed(() => {
+  const totalPages = Math.max(props.totalPages, 1);
+  const currentPage = Math.min(Math.max(props.currentPage, 1), totalPages);
+  const displayCount = 5; // max number of pages to display
   
   if (totalPages <= displayCount) {
-    // If we have fewer pages than display count, show all pages
+    // if total pages < displayCount, display all pages
     return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
   
-  // Calculate start and end of displayed pages
   let start = Math.max(currentPage - Math.floor(displayCount / 2), 1);
   let end = start + displayCount - 1;
   
-  // Adjust if end exceeds total pages
   if (end > totalPages) {
     end = totalPages;
     start = Math.max(end - displayCount + 1, 1);
@@ -126,30 +123,33 @@ const displayedPageNumbers = computed(() => {
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 });
 
-// Calculate start and end item numbers
-const startItem = computed(() => {
-  return (props.currentPage - 1) * props.itemsPerPage + 1;
+const safeStartItem = computed(() => {
+  if (props.totalItems === 0) return 0;
+  return Math.min((props.currentPage - 1) * props.itemsPerPage + 1, props.totalItems);
 });
 
-const endItem = computed(() => {
+const safeEndItem = computed(() => {
   return Math.min(props.currentPage * props.itemsPerPage, props.totalItems);
 });
 
-// Handle page change
 const changePage = (page: number) => {
-  if (page < 1 || page > props.totalPages || page === props.currentPage) {
+  if (page < 1 || page > props.totalPages || page === props.currentPage || props.totalPages === 0) {
     return;
   }
   emit('page-change', page);
 };
 
-// Handle items per page change
 const changeItemsPerPage = () => {
   emit('items-per-page-change', selectedItemsPerPage.value);
 };
 
-// Watch for prop changes
 watch(() => props.itemsPerPage, (newValue) => {
   selectedItemsPerPage.value = newValue;
+});
+
+watch(() => props.totalPages, (newValue) => {
+  if (props.currentPage > newValue && newValue > 0) {
+    emit('page-change', 1);
+  }
 });
 </script>

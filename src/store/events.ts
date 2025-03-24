@@ -95,6 +95,94 @@ const userEvents = ref<Event[]>([
     image: 'https://images.unsplash.com/photo-1527525443983-6e60c75fff46?q=80&w=2070&auto=format&fit=crop',
     createdBy: 'user1',
     isOnline: false
+  },
+  {
+    id: '103',
+    title: 'Virtual Reality Workshop',
+    description: 'Hands-on experience with the latest VR technology. Learn to create immersive environments and interactive simulations.',
+    date: new Date('2025-02-25'),
+    location: 'Online',
+    category: 'Technology',
+    image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: true
+  },
+  {
+    id: '104',
+    title: 'Book Club Meeting',
+    description: 'Monthly discussion of our latest book selection. Share your thoughts and insights in a friendly, casual environment.',
+    date: new Date('2025-03-22'),
+    location: 'Local Library',
+    category: 'Personal',
+    image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: false
+  },
+  {
+    id: '105',
+    title: 'Quarterly Business Review',
+    description: 'Team presentation of quarterly results and planning session for upcoming projects and initiatives.',
+    date: new Date('2025-04-02'),
+    location: 'Conference Room A',
+    category: 'Work',
+    image: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: false
+  },
+  {
+    id: '106',
+    title: 'Coding Hackathon',
+    description: '24-hour event where programmers collaborate on innovative projects. Prizes for most creative and useful applications.',
+    date: new Date('2025-05-15'),
+    location: 'Tech Hub',
+    category: 'Technology',
+    image: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: false
+  },
+  {
+    id: '107',
+    title: 'Online Meditation Session',
+    description: 'Guided meditation focusing on stress reduction and mindfulness techniques for daily life application.',
+    date: new Date('2025-03-30'),
+    location: 'Online',
+    category: 'Personal',
+    image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: true
+  },
+  {
+    id: '108',
+    title: 'Art Exhibition Opening',
+    description: 'Featuring my latest collection of mixed media works exploring themes of nature and urban landscapes.',
+    date: new Date('2025-06-05'),
+    location: 'Downtown Gallery',
+    category: 'Art',
+    image: 'https://images.unsplash.com/photo-1531058020387-3be344556be6?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: false
+  },
+  {
+    id: '109',
+    title: 'Cooking Class: International Cuisine',
+    description: 'Learn to prepare signature dishes from around the world with professional chef guidance and ingredient tips.',
+    date: new Date('2025-04-25'),
+    location: 'Culinary Institute',
+    category: 'Food',
+    image: 'https://images.unsplash.com/photo-1507048331197-7d4ac70811cf?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: false
+  },
+  {
+    id: '110',
+    title: 'Project Management Webinar',
+    description: 'Online session covering agile methodologies, team coordination, and effective resource allocation techniques.',
+    date: new Date('2025-03-18'),
+    location: 'Online',
+    category: 'Work',
+    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=2070&auto=format&fit=crop',
+    createdBy: 'user1',
+    isOnline: true
   }
 ]);
 
@@ -215,6 +303,7 @@ export function useEventStore() {
   const getUserData = () => {
     return userData.value;
   };
+  
 
   const updateUserData = (data: Partial<User>) => {
     userData.value = { ...userData.value, ...data };

@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "chart": "^0.1.2",
     "chart.js": "^4.4.8",
     "date-fns": "^4.1.0",
     "lucide-vue-next": "^0.482.0",
@@ -20,6 +21,7 @@
   "devDependencies": {
     "@testing-library/vue": "^8.1.0",
     "@vitejs/plugin-vue": "^5.2.2",
+    "@vitest/coverage-v8": "^3.0.9",
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.7.0",
     "autoprefixer": "^10.4.16",
@@ -28,7 +30,7 @@
     "tailwindcss": "^3.3.5",
     "typescript": "~5.7.2",
     "vite": "^6.2.0",
-    "vitest": "^3.0.8",
+    "vitest": "^3.0.9",
     "vue-tsc": "^2.2.4"
   },
   "description": "This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.",

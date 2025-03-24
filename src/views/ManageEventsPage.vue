@@ -163,7 +163,6 @@ const showEditEventModal = ref(false);
 const showEventDetailsModal = ref(false);
 const selectedEventId = ref('');
 
-// Pagination state
 const currentPage = ref(1);
 const itemsPerPage = ref(9);
 
@@ -175,7 +174,7 @@ const loadUserEvents = () => {
   userEvents.value = eventStore.getUserEvents();
 };
 
-// Filter events based on search query
+// search query
 const filteredEvents = computed(() => {
   if (!searchQuery.value) {
     return userEvents.value;
@@ -190,47 +189,37 @@ const filteredEvents = computed(() => {
   );
 });
 
-// Paginate filtered events
 const paginatedEvents = computed(() => {
   const startIndex = (currentPage.value - 1) * itemsPerPage.value;
   const endIndex = startIndex + itemsPerPage.value;
   return filteredEvents.value.slice(startIndex, endIndex);
 });
 
-// Calculate total pages
 const totalPages = computed(() => {
   return Math.ceil(filteredEvents.value.length / itemsPerPage.value);
 });
 
-// Handle page change
 const handlePageChange = (page: number) => {
   currentPage.value = page;
-  // Scroll to top when changing page
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// Handle items per page change
 const handleItemsPerPageChange = (items: number) => {
   itemsPerPage.value = items;
-  // Reset to first page when changing items per page
   currentPage.value = 1;
 };
 
-// Reset pagination when filters change
 watch(searchQuery, () => {
   currentPage.value = 1;
 });
 
-// Event highlighting logic
 const getEventHighlight = (event: Event) => {
   if (filteredEvents.value.length === 0) return '';
   
-  // Sort events by date
   const sortedByDate = [...filteredEvents.value].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
   
-  // Find earliest and latest events
   const earliestEvent = sortedByDate[0];
   const latestEvent = sortedByDate[sortedByDate.length - 1];
   
@@ -273,11 +262,9 @@ const eventDeleted = (eventId: string) => {
   const success = eventStore.deleteEvent(eventId);
   
   if (success) {
-    // If successful, reload events and close modal
     loadUserEvents();
     showEditEventModal.value = false;
   } else {
-    // Handle error case
     console.error('Failed to delete event:', eventId);
     alert('Failed to delete event. Please try again.');
   }
