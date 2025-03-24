@@ -73,6 +73,17 @@
             </div>
             <span class="text-xs mt-2 text-[#D9D9D9]">Trending</span>
           </router-link>
+          <!-- Charts -->
+          <router-link 
+            to="/charts" 
+            class="sidebar-item mb-8"
+            :class="{ 'active': currentRoute === '/charts' }"
+          >
+            <div class="icon-container">
+              <BarChart2 :size="20" class="text-[#D9D9D9]" />
+            </div>
+            <span class="text-xs mt-2 text-[#D9D9D9]">Charts</span>
+          </router-link>
           
           <!-- Profile -->
           <router-link 
@@ -105,7 +116,7 @@
   <script setup lang="ts">
   import { ref, computed } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { Layers, Search, X, Home, Zap, User, Shuffle } from 'lucide-vue-next';
+  import { Layers, Search, X, Home, Zap, User, Shuffle, BarChart2 } from 'lucide-vue-next';
   import { useEventStore } from '../store/events';
   import { useAuthStore } from '../store/auth'; // Add this import
   import EventDetailsModal from './EventDetailsModal.vue';

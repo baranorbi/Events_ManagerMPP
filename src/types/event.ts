@@ -12,11 +12,11 @@ export interface Event {
     isOnline?: boolean;
   }
   
-  export interface User {
+export interface User {
     id: string;
     name: string;
     description: string;
     avatar?: string;
     events: string[]; // IDs of events created by user
     interestedEvents: string[]; // IDs of events user is interested in
-  }
+}

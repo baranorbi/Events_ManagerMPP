@@ -4,6 +4,7 @@ import TrendingPage from '../views/TrendingPage.vue';
 import ProfilePage from '../views/ProfilePage.vue';
 import ManageEventsPage from '../views/ManageEventsPage.vue';
 import SignInPage from '../views/SignInPage.vue';
+import ChartPage from '../views/ChartPage.vue';
 import { useAuthStore } from '../store/auth';
 
 const routes = [
@@ -28,6 +29,11 @@ const routes = [
     name: 'ManageEvents',
     component: ManageEventsPage,
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/charts',
+    name: 'Charts',
+    component: ChartPage
   },
   {
     path: '/sign-in',
