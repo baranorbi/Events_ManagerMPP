@@ -153,13 +153,11 @@
   const allEvents = ref<Event[]>([]);
   const userEvents = ref<Event[]>([]);
   
-  // Load events data
   onMounted(() => {
     allEvents.value = eventStore.getAllEvents();
     userEvents.value = eventStore.getUserEvents();
   });
   
-  // Category statistics
   const categoryStats = computed(() => {
     const stats: Record<string, number> = {};
     
@@ -187,7 +185,7 @@
     return popularCategory;
   });
   
-  // Upcoming events (next 30 days)
+  // (next 30 days)
   const upcomingEventsCount = computed(() => {
     const today = new Date();
     const thirtyDaysLater = new Date(today);
@@ -199,7 +197,7 @@
     }).length;
   });
   
-  // Online vs In-Person ratio
+  // online vs in-person
   const onlineEvents = computed(() => {
     return allEvents.value.filter(event => event.isOnline === true);
   });
@@ -209,7 +207,6 @@
     return Math.round((onlineEvents.value.length / allEvents.value.length) * 100);
   });
   
-  // Timeline distribution
   const today = new Date();
   const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
@@ -248,7 +245,6 @@
     return Math.max(10, Math.round((futureEventsCount.value / totalEventsCount.value) * 100));
   });
   
-  // Event with the longest description
   const longestDescriptionEvent = computed(() => {
     if (allEvents.value.length === 0) return null;
     
@@ -260,7 +256,7 @@
     }, null as Event | null);
   });
   
-  // Busiest day (day with most events)
+  // busiest (day with most events)
   const busiestDay = computed(() => {
     const dayEventCounts: Record<string, { count: number, events: string[] }> = {};
     

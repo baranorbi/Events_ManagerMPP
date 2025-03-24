@@ -306,7 +306,7 @@ const handleDateRangeSelection = (dateRange: { startDate: Date, endDate: Date })
   applyFilters();
 };
 
-// Pagination state
+
 const currentPage = ref(1);
 const itemsPerPage = ref(9);
 
@@ -317,7 +317,7 @@ const paginatedEvents = computed(() => {
 });
 
 const totalPages = computed(() => {
-  return Math.ceil(filteredEvents.value.length / itemsPerPage.value);
+  return Math.ceil(filteredEvents.value.length / itemsPerPage.value) || 1;
 });
 
 const handlePageChange = (page: number) => {
@@ -327,10 +327,18 @@ const handlePageChange = (page: number) => {
 
 const handleItemsPerPageChange = (items: number) => {
   itemsPerPage.value = items;
-  currentPage.value = 1;
+  const maxPage = Math.ceil(filteredEvents.value.length / items) || 1;
+  if (currentPage.value > maxPage) {
+    currentPage.value = maxPage;
+  }
 };
 
-watch([filters, filteredEvents], () => {
-  currentPage.value = 1;
-});
+watch([() => filters.value, () => eventStore.getAllEvents().length], () => {
+  const maxPage = Math.ceil(filteredEvents.value.length / itemsPerPage.value) || 1;
+  if (currentPage.value > maxPage) {
+    currentPage.value = 1;
+  }
+}, { immediate: true });
+
+
 </script>
