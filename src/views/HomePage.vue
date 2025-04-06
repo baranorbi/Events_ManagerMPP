@@ -4,21 +4,23 @@
       <!-- Filters -->
       <div class="flex flex-wrap items-center gap-2">
         <div class="relative">
-          <button 
+          <button
             @click="showCategoryDropdown = !showCategoryDropdown"
             class="flex items-center gap-2 px-4 py-2 bg-[#232323] rounded-md border border-[#737373]"
+            :class="{ 'border-[#533673] text-[#D9D9D9]': filters.category !== 'All categories' }"
           >
-            <ChevronDown :size="16" class="text-[#D9D9D9]" />
             <span class="text-[#D9D9D9]">{{ filters.category }}</span>
+            <ChevronDown :size="16" class="text-[#D9D9D9]" />
           </button>
           
-          <div v-if="showCategoryDropdown" class="absolute z-10 mt-1 w-48 bg-[#232323] border border-[#737373] rounded-md shadow-lg">
+          <div v-if="showCategoryDropdown" class="absolute z-10 mt-1 w-40 bg-[#232323] border border-[#737373] rounded-md shadow-lg">
             <div class="py-1">
-              <button 
-                v-for="category in categories" 
+              <button
+                v-for="category in categories"
                 :key="category"
                 @click="selectCategory(category)"
-                class="block w-full text-left px-4 py-2 text-[#D9D9D9] hover:bg-[#333333]"
+                class="block px-4 py-2 text-[#D9D9D9] hover:bg-[#333333] w-full text-left"
+                :class="{ 'bg-[#533673] bg-opacity-20': category === filters.category }"
               >
                 {{ category }}
               </button>
@@ -27,22 +29,20 @@
         </div>
         
         <!-- Date Filter -->
-        <div class="relative">
-          <button 
+        <div class="relative calendar-container">
+          <button
             @click="toggleCalendar"
-            data-calendar-toggle
             class="flex items-center gap-2 px-4 py-2 bg-[#232323] rounded-md border border-[#737373]"
+            :class="{ 'border-[#533673] text-[#D9D9D9]': filters.startDate || filters.endDate }"
+            data-calendar-toggle
           >
             <Calendar :size="16" class="text-[#D9D9D9]" />
-            <span class="text-[#D9D9D9]">Date Range</span>
+            <span class="text-[#D9D9D9]">
+              {{ filters.startDate ? filters.startDate + ' to ' + filters.endDate : 'Date Range' }}
+            </span>
           </button>
           
-          <!-- Calendar Component Dropdown -->
-          <div 
-            v-if="showCalendar" 
-            class="absolute z-20 mt-2 bg-[#232323] border border-[#737373] rounded-md shadow-xl calendar-container"
-            style="transform: translateX(-25%);"
-          >
+          <div v-if="showCalendar" class="absolute z-10 mt-1">
             <CalendarFilter
               :initial-start-date="getDateFromString(filters.startDate)"
               :initial-end-date="getDateFromString(filters.endDate)"
@@ -54,10 +54,10 @@
         <button 
           @click="toggleOnlineFilter"
           class="flex items-center gap-2 px-4 py-2 bg-[#232323] rounded-md border border-[#737373]"
-          :class="{ 'border-[#533673] text-[#D9D9D9]': filters.isOnline }"
+          :class="{ 'border-[#533673] bg-[#533673] bg-opacity-20': filters.isOnline }"
         >
           <Play :size="16" class="text-[#D9D9D9]" />
-          <span class="text-[#D9D9D9]">{{ filters.isOnline ? 'Online' : 'All Locations' }}</span>
+          <span class="text-[#D9D9D9]">{{ filters.isOnline ? 'Online Only' : 'All Locations' }}</span>
         </button>
         
         <button 
@@ -65,19 +65,19 @@
           class="px-4 py-2 bg-[#533673] rounded-md text-white hover:bg-opacity-90 transition-colors"
           :disabled="isLoading"
         >
-          <span v-if="isLoading">Loading...</span>
-          <span v-else>Apply Filters</span>
+          Apply Filters
         </button>
         
         <button 
           @click="resetFilters"
-          class="px-4 py-2 bg-[#232323] rounded-md text-[#D9D9D9] hover:bg-[#333333] transition-colors"
+          class="px-4 py-2 bg-[#232323] rounded-md text-[#D9D9D9] hover:bg-[#333333] transition-colors border border-[#737373]"
           :disabled="isLoading"
         >
           Reset
         </button>
       </div>
     </div>
+    
     <!-- Sort Dropdown -->
     <div class="relative sort-dropdown">
       <button 
@@ -91,18 +91,19 @@
       
       <div v-if="showSortDropdown" class="absolute z-10 mt-1 w-64 bg-[#232323] border border-[#737373] rounded-md shadow-lg">
         <div class="py-1">
-          <button 
-            v-for="option in sortOptions" 
-            :key="`${option.value}-${option.order}`"
+          <button
+            v-for="option in sortOptions"
+            :key="option.label"
             @click="selectSortOption(option)"
-            class="block w-full text-left px-4 py-2 text-[#D9D9D9] hover:bg-[#333333]"
-            :class="{'bg-[#333333]': filters.sortBy === option.value && filters.sortOrder === option.order}"
+            class="block px-4 py-2 text-[#D9D9D9] hover:bg-[#333333] w-full text-left"
+            :class="{ 'bg-[#533673] bg-opacity-20': filters.sortBy === option.value && filters.sortOrder === option.order }"
           >
             {{ option.label }}
           </button>
         </div>
       </div>
     </div>
+    
     <!-- Loading state -->
     <div v-if="isLoading" class="flex justify-center py-12">
       <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#533673]"></div>
@@ -130,7 +131,7 @@
         </div>
       </div>
       
-      <!-- Add pagination controls -->
+      <!-- Add pagination controls with required props -->
       <PaginationControls
         :current-page="currentPage"
         :total-pages="totalPages"
@@ -161,7 +162,6 @@
     />
   </AppLayout>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { ChevronDown, Calendar, Play, SortAsc, SortDesc } from 'lucide-vue-next';
@@ -285,6 +285,7 @@ const selectCategory = (category: string) => {
 
 const toggleOnlineFilter = () => {
   filters.value.isOnline = !filters.value.isOnline;
+  applyFilters();
 };
 
 const applyFilters = async () => {

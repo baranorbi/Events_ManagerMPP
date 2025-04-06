@@ -28,9 +28,14 @@
         </div>
         
         <div class="flex items-center text-[#D9D9D9] mb-3">
-          <MapPin class="w-4 h-4 mr-2" />
+          <div class="flex items-center">
+            <!-- Use different icon for online events -->
+            <MapPin v-if="!event.isOnline" class="w-4 h-4 mr-2" />
+            <Video v-else class="w-4 h-4 mr-2 text-[#533673]" />
+          </div>
           <span class="text-sm">{{ event.location }}</span>
-          <span v-if="event.isOnline" class="ml-2 px-2 py-0.5 bg-[#533673] bg-opacity-20 text-[#D9D9D9] text-xs rounded-full">
+          <!-- Make online badge more visible -->
+          <span v-if="event.isOnline" class="ml-2 px-2 py-0.5 bg-[#533673] text-white text-xs rounded-full">
             Online
           </span>
         </div>
@@ -53,7 +58,7 @@
   </template>
   
   <script setup lang="ts">
-  import { Calendar, MapPin, Image } from 'lucide-vue-next';
+  import { Calendar, MapPin, Image, Video } from 'lucide-vue-next';
   import type { Event } from '../types/event';
   
   const props = defineProps<{
