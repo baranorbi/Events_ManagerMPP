@@ -1,7 +1,22 @@
 <template>
-    <div class="bg-[#232323] border border-[#737373] rounded-lg p-6 mb-8">
-      <h2 class="text-2xl font-bold mb-4 text-[#D9D9D9]">Event Statistics</h2>
-      
+  <div class="bg-[#232323] border border-[#737373] rounded-lg p-6 mb-8">
+    <h2 class="text-2xl font-bold mb-4 text-[#D9D9D9]">Event Statistics</h2>
+    
+    <div v-if="loading" class="flex justify-center py-6">
+      <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#533673]"></div>
+    </div>
+    
+    <div v-else-if="error" class="text-center py-6">
+      <p class="text-red-500">{{ error }}</p>
+      <button 
+        @click="loadData" 
+        class="mt-4 px-4 py-2 bg-[#533673] rounded-md text-white hover:bg-opacity-90 transition-colors"
+      >
+        Try Again
+      </button>
+    </div>
+    
+    <div v-else>
       <!-- Statistics Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <!-- Most Popular Category -->
@@ -133,162 +148,179 @@
         </div>
       </div>
     </div>
-  </template>
+  </div>
+</template>
   
-  <script setup lang="ts">
-  import { ref, computed, onMounted } from 'vue';
-  import { 
-    Calendar, 
-    ChartPie as ChartPieIcon, 
-    Monitor as MonitorIcon, 
-    Clock as ClockIcon, 
-    FileText as FileTextIcon,
-    CalendarDays as CalendarDaysIcon
-  } from 'lucide-vue-next';
-  import { useEventStore } from '../store/events';
-  import type { Event } from '../types/event';
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue';
+import { 
+  Calendar, 
+  ChartPie as ChartPieIcon, 
+  Monitor as MonitorIcon, 
+  Clock as ClockIcon, 
+  FileText as FileTextIcon,
+  CalendarDays as CalendarDaysIcon
+} from 'lucide-vue-next';
+import { useEventStore } from '../store/events';
+import type { Event } from '../types/event';
+
+const emit = defineEmits(['view-event-details']);
+const eventStore = useEventStore();
+const allEvents = ref<Event[]>([]);
+const userEvents = ref<Event[]>([]);
+const loading = ref(true);
+const error = ref('');
+
+onMounted(async () => {
+  await loadData();
+});
+
+const loadData = async () => {
+  loading.value = true;
+  error.value = '';
   
-  const emit = defineEmits(['view-event-details']);
-  const eventStore = useEventStore();
-  const allEvents = ref<Event[]>([]);
-  const userEvents = ref<Event[]>([]);
+  try {
+    allEvents.value = await eventStore.getAllEvents();
+    userEvents.value = await eventStore.getUserEvents();
+  } catch (err) {
+    console.error('Failed to load statistics data:', err);
+    error.value = 'Failed to load statistics. Please try again.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+const categoryStats = computed(() => {
+  const stats: Record<string, number> = {};
   
-  onMounted(() => {
-    allEvents.value = eventStore.getAllEvents();
-    userEvents.value = eventStore.getUserEvents();
+  allEvents.value.forEach(event => {
+    if (!stats[event.category]) {
+      stats[event.category] = 0;
+    }
+    stats[event.category]++;
   });
   
-  const categoryStats = computed(() => {
-    const stats: Record<string, number> = {};
-    
-    allEvents.value.forEach(event => {
-      if (!stats[event.category]) {
-        stats[event.category] = 0;
-      }
-      stats[event.category]++;
-    });
-    
-    return stats;
+  return stats;
+});
+
+const mostPopularCategory = computed(() => {
+  let maxCount = 0;
+  let popularCategory = 'None';
+  
+  Object.entries(categoryStats.value).forEach(([category, count]) => {
+    if (count > maxCount) {
+      maxCount = count;
+      popularCategory = category;
+    }
   });
   
-  const mostPopularCategory = computed(() => {
-    let maxCount = 0;
-    let popularCategory = 'None';
-    
-    Object.entries(categoryStats.value).forEach(([category, count]) => {
-      if (count > maxCount) {
-        maxCount = count;
-        popularCategory = category;
-      }
-    });
-    
-    return popularCategory;
-  });
-  
-  // (next 30 days)
-  const upcomingEventsCount = computed(() => {
-    const today = new Date();
-    const thirtyDaysLater = new Date(today);
-    thirtyDaysLater.setDate(today.getDate() + 30);
-    
-    return allEvents.value.filter(event => {
-      const eventDate = new Date(event.date);
-      return eventDate >= today && eventDate <= thirtyDaysLater;
-    }).length;
-  });
-  
-  // online vs in-person
-  const onlineEvents = computed(() => {
-    return allEvents.value.filter(event => event.isOnline === true);
-  });
-  
-  const onlineEventsPercentage = computed(() => {
-    if (allEvents.value.length === 0) return 0;
-    return Math.round((onlineEvents.value.length / allEvents.value.length) * 100);
-  });
-  
+  return popularCategory;
+});
+
+// (next 30 days)
+const upcomingEventsCount = computed(() => {
   const today = new Date();
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const thirtyDaysLater = new Date(today);
+  thirtyDaysLater.setDate(today.getDate() + 30);
   
-  const pastEventsCount = computed(() => {
-    return allEvents.value.filter(event => new Date(event.date) < firstDayOfMonth).length;
-  });
+  return allEvents.value.filter(event => {
+    const eventDate = new Date(event.date);
+    return eventDate >= today && eventDate <= thirtyDaysLater;
+  }).length;
+});
+
+// online vs in-person
+const onlineEvents = computed(() => {
+  return allEvents.value.filter(event => event.isOnline === true);
+});
+
+const onlineEventsPercentage = computed(() => {
+  if (allEvents.value.length === 0) return 0;
+  return Math.round((onlineEvents.value.length / allEvents.value.length) * 100);
+});
+
+const today = new Date();
+const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+const pastEventsCount = computed(() => {
+  return allEvents.value.filter(event => new Date(event.date) < firstDayOfMonth).length;
+});
+
+const currentMonthEventsCount = computed(() => {
+  return allEvents.value.filter(event => {
+    const eventDate = new Date(event.date);
+    return eventDate >= firstDayOfMonth && eventDate <= lastDayOfMonth;
+  }).length;
+});
+
+const futureEventsCount = computed(() => {
+  return allEvents.value.filter(event => new Date(event.date) > lastDayOfMonth).length;
+});
+
+const totalEventsCount = computed(() => {
+  return pastEventsCount.value + currentMonthEventsCount.value + futureEventsCount.value;
+});
+
+const pastEventsPercentage = computed(() => {
+  if (totalEventsCount.value === 0) return 33;
+  return Math.max(10, Math.round((pastEventsCount.value / totalEventsCount.value) * 100));
+});
+
+const currentMonthEventsPercentage = computed(() => {
+  if (totalEventsCount.value === 0) return 34;
+  return Math.max(10, Math.round((currentMonthEventsCount.value / totalEventsCount.value) * 100));
+});
+
+const futureEventsPercentage = computed(() => {
+  if (totalEventsCount.value === 0) return 33;
+  return Math.max(10, Math.round((futureEventsCount.value / totalEventsCount.value) * 100));
+});
+
+const longestDescriptionEvent = computed(() => {
+  if (allEvents.value.length === 0) return null;
   
-  const currentMonthEventsCount = computed(() => {
-    return allEvents.value.filter(event => {
-      const eventDate = new Date(event.date);
-      return eventDate >= firstDayOfMonth && eventDate <= lastDayOfMonth;
-    }).length;
-  });
-  
-  const futureEventsCount = computed(() => {
-    return allEvents.value.filter(event => new Date(event.date) > lastDayOfMonth).length;
-  });
-  
-  const totalEventsCount = computed(() => {
-    return pastEventsCount.value + currentMonthEventsCount.value + futureEventsCount.value;
-  });
-  
-  const pastEventsPercentage = computed(() => {
-    if (totalEventsCount.value === 0) return 33;
-    return Math.max(10, Math.round((pastEventsCount.value / totalEventsCount.value) * 100));
-  });
-  
-  const currentMonthEventsPercentage = computed(() => {
-    if (totalEventsCount.value === 0) return 34;
-    return Math.max(10, Math.round((currentMonthEventsCount.value / totalEventsCount.value) * 100));
-  });
-  
-  const futureEventsPercentage = computed(() => {
-    if (totalEventsCount.value === 0) return 33;
-    return Math.max(10, Math.round((futureEventsCount.value / totalEventsCount.value) * 100));
-  });
-  
-  const longestDescriptionEvent = computed(() => {
-    if (allEvents.value.length === 0) return null;
+  return allEvents.value.reduce((longest, current) => {
+    const longestLength = longest?.description?.length || 0;
+    const currentLength = current.description?.length || 0;
     
-    return allEvents.value.reduce((longest, current) => {
-      const longestLength = longest?.description?.length || 0;
-      const currentLength = current.description?.length || 0;
-      
-      return currentLength > longestLength ? current : longest;
-    }, null as Event | null);
+    return currentLength > longestLength ? current : longest;
+  }, null as Event | null);
+});
+
+// busiest (day with most events)
+const busiestDay = computed(() => {
+  const dayEventCounts: Record<string, { count: number, events: string[] }> = {};
+  
+  allEvents.value.forEach(event => {
+    const dateString = new Date(event.date).toDateString();
+    
+    if (!dayEventCounts[dateString]) {
+      dayEventCounts[dateString] = { count: 0, events: [] };
+    }
+    
+    dayEventCounts[dateString].count++;
+    dayEventCounts[dateString].events.push(event.title);
   });
   
-  // busiest (day with most events)
-  const busiestDay = computed(() => {
-    const dayEventCounts: Record<string, { count: number, events: string[] }> = {};
-    
-    allEvents.value.forEach(event => {
-      const dateString = new Date(event.date).toDateString();
-      
-      if (!dayEventCounts[dateString]) {
-        dayEventCounts[dateString] = { count: 0, events: [] };
-      }
-      
-      dayEventCounts[dateString].count++;
-      dayEventCounts[dateString].events.push(event.title);
-    });
-    
-    let maxDate = '';
-    let maxCount = 0;
-    
-    Object.entries(dayEventCounts).forEach(([date, data]) => {
-      if (data.count > maxCount) {
-        maxCount = data.count;
-        maxDate = date;
-      }
-    });
-    
-    return { 
-      date: maxDate ? new Date(maxDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'None',
-      count: maxCount,
-      events: maxDate ? dayEventCounts[maxDate].events : []
-    };
+  let maxDate = '';
+  let maxCount = 0;
+  
+  Object.entries(dayEventCounts).forEach(([date, data]) => {
+    if (data.count > maxCount) {
+      maxCount = data.count;
+      maxDate = date;
+    }
   });
   
-  const viewEventDetails = (eventId: string) => {
-    emit('view-event-details', eventId);
+  return { 
+    date: maxDate ? new Date(maxDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'None',
+    count: maxCount,
+    events: maxDate ? dayEventCounts[maxDate].events : []
   };
-  </script>
+});
+
+const viewEventDetails = (eventId: string) => {
+  emit('view-event-details', eventId);
+};
+</script>

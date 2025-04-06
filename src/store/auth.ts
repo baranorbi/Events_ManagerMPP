@@ -1,13 +1,5 @@
 import { ref } from 'vue';
-
-const users = [
-  {
-    id: 'user1',
-    email: 'john@example.com',
-    password: 'password123',
-    name: 'John Doe'
-  }
-];
+import api from './api';
 
 interface User {
   id: string;
@@ -18,6 +10,7 @@ interface User {
 const currentUser = ref<User | null>(null);
 const isAuthenticated = ref(false);
 
+// Try to load auth state from localStorage for persistence between page refreshes
 try {
   const savedAuth = localStorage.getItem('auth');
   if (savedAuth) {
@@ -30,27 +23,28 @@ try {
 }
 
 export function useAuthStore() {
-  const signIn = (email: string, password: string) => {
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-      const userWithoutPassword = {
-        id: user.id,
-        email: user.email,
-        name: user.name
-      };
+  const signIn = async (email: string, password: string) => {
+    try {
+      const response = await api.post('/auth/', { email, password });
       
-      currentUser.value = userWithoutPassword;
-      isAuthenticated.value = true;
+      const user = response.data;
       
-      localStorage.setItem('auth', JSON.stringify({
-        user: userWithoutPassword
-      }));
+      if (user) {
+        currentUser.value = user;
+        isAuthenticated.value = true;
+        
+        localStorage.setItem('auth', JSON.stringify({
+          user
+        }));
+        
+        return true;
+      }
       
-      return true;
+      return false;
+    } catch (error) {
+      console.error('Authentication error:', error);
+      return false;
     }
-    
-    return false;
   };
   
   const signOut = () => {

@@ -287,6 +287,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { Calendar, Map, ChevronDown, Clock, Upload, Image } from 'lucide-vue-next';
 import { useEventStore } from '../store/events';
+import { useAuthStore } from '../store/auth';
+import axios from 'axios';
 
 const emit = defineEmits(['close', 'created']);
 const eventStore = useEventStore();
@@ -522,12 +524,59 @@ const validateForm = (): boolean => {
         throw new Error('Invalid date');
       }
       
+      const now = new Date();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      if (parsedDate < today) {
+      const selectedDay = new Date(parsedDate);
+      selectedDay.setHours(0, 0, 0, 0);
+      
+      // For dates in the past (before today), reject
+      if (selectedDay < today) {
         fieldErrors.value.date = 'Event date cannot be in the past';
         validationErrors.value.push('Event date cannot be in the past');
+      } 
+      // For today's date, check if the time is in the future
+      else if (selectedDay.getTime() === today.getTime()) {
+        // Only validate time if it's today's date
+        if (event.value.startTime) {
+          const timeRegex = /^(0?[1-9]|1[0-2]):([0-5][0-9])\s?(AM|PM|am|pm)$|^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+          const match = event.value.startTime.match(timeRegex);
+          
+          if (match) {
+            let hours: number;
+            let minutes: number;
+            
+            if (match[1] !== undefined) {
+              // 12-hour format
+              hours = parseInt(match[1], 10);
+              minutes = parseInt(match[2], 10);
+              const meridiem = match[3].toLowerCase();
+              
+              if (meridiem === 'pm' && hours < 12) {
+                hours += 12;
+              } else if (meridiem === 'am' && hours === 12) {
+                hours = 0;
+              }
+            } else {
+              // 24-hour format
+              hours = parseInt(match[4], 10);
+              minutes = parseInt(match[5], 10);
+            }
+            
+            const eventTime = new Date();
+            eventTime.setHours(hours, minutes, 0, 0);
+            
+            if (eventTime <= now) {
+              fieldErrors.value.startTime = 'Start time must be in the future';
+              validationErrors.value.push('For today\'s events, start time must be in the future');
+            }
+          }
+        } else {
+          // If it's today and no start time provided, require it
+          fieldErrors.value.startTime = 'Start time is required for today\'s events';
+          validationErrors.value.push('Start time is required for today\'s events');
+        }
       }
     } catch (e) {
       fieldErrors.value.date = 'Invalid date format';
@@ -562,40 +611,126 @@ const validateAndCreateEvent = async () => {
   isSubmitting.value = true;
   
   try {
-    // date
+    // Create a new object for the API request with proper type annotations
+    const eventData: {
+      title: string;
+      description: string;
+      category: string;
+      location: string;
+      is_online: boolean;
+      date?: string;
+      start_time?: string;
+      end_time?: string;
+      image?: string;
+      created_by?: string;
+    } = {
+      title: event.value.title,
+      description: event.value.description,
+      category: event.value.category,
+      location: event.value.location,
+      is_online: event.value.isOnline || false
+    };
+
+    // Format the date properly for the API (YYYY-MM-DD) with timezone handling
     if (dateString.value) {
+      // Use the date from dateString but ensure it's not in the past
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to start of day
+      
       const parsedDate = new Date(dateString.value);
-      if (!isNaN(parsedDate.getTime())) {
-        event.value.date = parsedDate;
+      parsedDate.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
+      
+      if (isNaN(parsedDate.getTime())) {
+        throw new Error('Invalid date format');
       }
+      
+      // Make sure the date is today or in the future
+      if (parsedDate < today) {
+        // If the date is in the past, use tomorrow's date
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(12, 0, 0, 0);
+        eventData.date = tomorrow.toISOString().split('T')[0];
+        alert('The date was adjusted to tomorrow as past dates are not allowed.');
+      } else {
+        // Use the selected date
+        eventData.date = parsedDate.toISOString().split('T')[0];
+      }
+    } else {
+      // If no date is provided, use tomorrow
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(12, 0, 0, 0);
+      eventData.date = tomorrow.toISOString().split('T')[0];
     }
     
-    // image
+    // Continue with the rest of your event creation code...
+    // Add times if provided
+    if (event.value.startTime) {
+      eventData.start_time = event.value.startTime;
+    }
+    
+    if (event.value.endTime) {
+      eventData.end_time = event.value.endTime;
+    }
+    
+    // Handle image upload or URL
     if (imageSource.value === 'upload' && selectedFile.value) {
       try {
-        // "upload" the file and get the path
         const imagePath = await eventStore.saveUploadedImage(selectedFile.value);
         if (!imagePath) throw new Error('Failed to upload image');
-        event.value.image = imagePath;
+        eventData.image = imagePath;
       } catch (uploadError) {
         console.error('Image upload error:', uploadError);
-        validationErrors.value.push('Failed to upload image. Please try again.');
+        validationErrors.value.push(
+          uploadError instanceof Error 
+            ? `Image upload failed: ${uploadError.message}` 
+            : 'Failed to upload image. Please try again.'
+        );
         isSubmitting.value = false;
         return;
       }
     } else if (imageSource.value === 'url' && imageUrl.value) {
-      event.value.image = imageUrl.value;
+      eventData.image = imageUrl.value;
     }
     
-    const newEventId = eventStore.createEvent(event.value);
+    // Add createdBy if user is authenticated
+    const auth = useAuthStore();
+    if (auth.checkAuth()) {
+      eventData.created_by = auth.getUser()?.id;
+    }
+    
+    console.log('Creating event with data:', eventData);
+    
+    // Make API call to create the event
+    const newEventId = await eventStore.createEvent(eventData);
+    
+    console.log('Event created successfully with ID:', newEventId);
     emit('created', newEventId);
     emit('close');
   } catch (error) {
     console.error('Error creating event:', error);
-    validationErrors.value.push(error instanceof Error ? error.message : 'Failed to create event. Please try again.');
+    if (axios.isAxiosError(error) && error.response) {
+      // Extract validation errors from the API response
+      const apiErrors = error.response.data;
+      console.log('API validation errors:', apiErrors);
+      
+      if (typeof apiErrors === 'object') {
+        // Format and display field-specific errors
+        validationErrors.value = Object.entries(apiErrors)
+          .map(([field, message]) => `${field}: ${message}`)
+          .flat();
+      } else {
+        validationErrors.value = [String(apiErrors)];
+      }
+    } else {
+      validationErrors.value = [error instanceof Error ? error.message : 'Failed to create event'];
+    }
+  } finally {
     isSubmitting.value = false;
   }
 };
+
 
 onMounted(() => {
   dateString.value = formatDate(new Date());

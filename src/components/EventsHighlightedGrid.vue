@@ -2,8 +2,8 @@
   <div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div 
-        v-for="event in sortedAndHighlightedEvents" 
-        :key="event.id"
+        v-for="(event, index) in sortedAndHighlightedEvents" 
+        :key="`${event.id}-${index}`"
         class="relative"
       >
         <!-- Highlight Badge -->
