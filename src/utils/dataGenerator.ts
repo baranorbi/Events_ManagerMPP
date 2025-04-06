@@ -1,169 +1,180 @@
-import { addDays, subDays, parseISO } from 'date-fns';
-import type { Event } from '../types/event';
+import type { Event } from "../types/event"
 
 export const chartDataGenerator = {
   enhanceEvents(baseEvents: Event[], additionalCount = 30): Event[] {
-    const enhancedEvents = [...baseEvents];
-    const categories = Array.from(new Set(baseEvents.map(e => e.category)));
-    const locations = Array.from(new Set(baseEvents.map(e => e.location)));
-    
-    const fallbackCategories = ['Conference', 'Workshop', 'Seminar', 'Webinar', 'Meetup', 'Training'];
-    const fallbackLocations = ['New York', 'San Francisco', 'Remote', 'Chicago', 'Boston', 'Austin'];
-    
-    const usableCategories = categories.length > 0 ? categories : fallbackCategories;
-    const usableLocations = locations.length > 0 ? locations : fallbackLocations;
-    
+    const enhancedEvents = [...baseEvents]
+    const categories = Array.from(new Set(baseEvents.map((e) => e.category)))
+    const locations = Array.from(new Set(baseEvents.map((e) => e.location)))
+
+    const fallbackCategories = ["Conference", "Workshop", "Seminar", "Webinar", "Meetup", "Training"]
+    const fallbackLocations = ["New York", "San Francisco", "Remote", "Chicago", "Boston", "Austin"]
+
+    const usableCategories = categories.length > 0 ? categories : fallbackCategories
+    const usableLocations = locations.length > 0 ? locations : fallbackLocations
+
+    // Get today and ensure future dates
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    // Start date should be at least tomorrow to avoid validation errors
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    // End date is 6 months in the future
+    const endDate = new Date(today)
+    endDate.setMonth(today.getMonth() + 6)
+
+    // Create a base timestamp outside the loop
+    const baseTimestamp = Date.now()
+
     for (let i = 0; i < additionalCount; i++) {
-      const randomBase = baseEvents.length > 0 
-        ? {...baseEvents[Math.floor(Math.random() * baseEvents.length)]} 
-        : { title: 'Event', description: 'Description' };
-      
-      const isOnline = Math.random() > 0.5;
-      const category = usableCategories[Math.floor(Math.random() * usableCategories.length)];
-      
-      const today = new Date();
-      const startDate = subDays(today, 180);  // 6 months ago
-      const endDate = addDays(today, 90);     // 3 months in future
-      const eventDate = this.generateWeightedDate(startDate, endDate);
-      
+      const randomBase =
+        baseEvents.length > 0
+          ? { ...baseEvents[Math.floor(Math.random() * baseEvents.length)] }
+          : { title: "Event", description: "Description" }
+
+      const isOnline = Math.random() > 0.5
+      const category = usableCategories[Math.floor(Math.random() * usableCategories.length)]
+
+      // Generate a random date between tomorrow and endDate (ensuring future dates)
+      const timeDiff = endDate.getTime() - tomorrow.getTime()
+      const randomTime = Math.random() * timeDiff
+      const eventDate = new Date(tomorrow.getTime() + randomTime)
+
+      // Format the date as ISO string (YYYY-MM-DD)
+      const formattedDate = eventDate.toISOString().split("T")[0]
+
+      // Create a truly unique ID by:
+      // 1. Using base timestamp to keep time precision
+      // 2. Adding the index to ensure uniqueness within the batch
+      // 3. Adding a random number to avoid collisions between batches
+      const uniqueId = `generated-${baseTimestamp}-${i}-${Math.floor(Math.random() * 10000)}`
+
       enhancedEvents.push({
         ...randomBase,
-        id: `generated-${Date.now()}-${i}`,
+        id: uniqueId,
         title: `${category} ${Math.floor(Math.random() * 100)}`,
+        description: `This is a generated ${category} event for testing purposes.`,
         category,
-        date: eventDate,
-        location: isOnline ? 'Remote' : usableLocations[Math.floor(Math.random() * usableLocations.length)],
-        isOnline
-      });
+        date: new Date(formattedDate), // Convert string to Date object
+        location: isOnline ? "Remote" : usableLocations[Math.floor(Math.random() * usableLocations.length)],
+        isOnline,
+      })
     }
-    
-    return enhancedEvents;
+
+    return enhancedEvents
   },
-  
-  enhanceTimelineData(events: Event[]): { labels: string[], data: number[] } {
-    const monthsMap = new Map<string, number>();
-    
-    const today = new Date();
+
+  enhanceTimelineData(events: Event[]): { labels: string[]; data: number[] } {
+    const monthsMap = new Map<string, number>()
+
+    const today = new Date()
     for (let i = -9; i <= 2; i++) {
-      const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      monthsMap.set(key, 0);
+      const date = new Date(today.getFullYear(), today.getMonth() + i, 1)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+      monthsMap.set(key, 0)
     }
-    
-    events.forEach(event => {
+
+    events.forEach((event) => {
       if (event.date) {
         try {
-          const date = typeof event.date === 'string' ? parseISO(event.date) : new Date(event.date);
-          const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-          
-          if (monthsMap.has(key)) {
-            monthsMap.set(key, (monthsMap.get(key) || 0) + 1);
+          const date = typeof event.date === "string" ? new Date(event.date) : event.date
+          if (!isNaN(date.getTime())) {
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+            if (monthsMap.has(key)) {
+              monthsMap.set(key, (monthsMap.get(key) || 0) + 1)
+            }
           }
         } catch (e) {
-          console.error("Error parsing date", event.date);
+          console.error("Error parsing date:", event.date, e)
         }
       }
-    });
-    
-    let baseTrend = 3;
-    const enhancedMonthsMap = new Map<string, number>();
-    
-    const sortedMonths = Array.from(monthsMap.keys()).sort();
-    
-    sortedMonths.forEach((month, _index) => {
-      const actualCount = monthsMap.get(month) || 0;
-      
-      baseTrend += (Math.random() - 0.4) * 0.8;
-      baseTrend = Math.max(1, baseTrend);
-      
-      const monthNum = parseInt(month.split('-')[1]);
-      let seasonality = 0;
+    })
+
+    let baseTrend = 3
+    const enhancedMonthsMap = new Map<string, number>()
+
+    const sortedMonths = Array.from(monthsMap.keys()).sort()
+
+    sortedMonths.forEach((month) => {
+      const actualCount = monthsMap.get(month) || 0
+
+      baseTrend += (Math.random() - 0.4) * 0.8
+      baseTrend = Math.max(1, baseTrend)
+
+      const monthNum = Number.parseInt(month.split("-")[1])
+      let seasonality = 0
       if ([3, 4, 5, 9, 10, 11].includes(monthNum)) {
-        seasonality = 2; // Spring/Fall boost
+        seasonality = 2
       } else if ([6, 7, 8].includes(monthNum)) {
-        seasonality = -1; // Summer dip
+        seasonality = -1
       }
-      
-      const enhancedValue = actualCount > 0
-        ? actualCount + Math.floor(Math.random() * 2) // random variation on real data
-        : Math.max(0, Math.round(baseTrend + seasonality + (Math.random() * 2))); // gen data
-      
-      enhancedMonthsMap.set(month, enhancedValue);
-    });
-    
-    const formattedLabels = sortedMonths.map(key => {
-      const [year, month] = key.split('-');
-      return `${new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('default', { month: 'short' })} ${year}`;
-    });
-    
+
+      const enhancedValue =
+        actualCount > 0
+          ? actualCount + Math.floor(Math.random() * 2) // random variation on real data
+          : Math.max(0, Math.round(baseTrend + seasonality + Math.random() * 2)) // gen data
+
+      enhancedMonthsMap.set(month, enhancedValue)
+    })
+
+    const formattedLabels = sortedMonths.map((key) => {
+      const [year, month] = key.split("-")
+      return `${new Date(Number.parseInt(year), Number.parseInt(month) - 1).toLocaleDateString("default", { month: "short" })} ${year}`
+    })
+
     return {
       labels: formattedLabels,
-      data: Array.from(enhancedMonthsMap.values())
-    };
+      data: Array.from(enhancedMonthsMap.values()),
+    }
   },
-  
+
   enhanceCategoryData(events: Event[], categories: string[]): number[] {
     const categoryWeights = {
-      'Conference': 1.2,
-      'Workshop': 1.5,
-      'Seminar': 1.0,
-      'Webinar': 2.0,
-      'Meetup': 1.3,
-      'Training': 0.8
-    };
-    
-    const categoryCounts = categories.map(category => {
-      const actualCount = events.filter(e => e.category === category).length;
-      
+      Conference: 1.2,
+      Workshop: 1.5,
+      Seminar: 1.0,
+      Webinar: 2.0,
+      Meetup: 1.3,
+      Training: 0.8,
+    }
+
+    const categoryCounts = categories.map((category) => {
+      const actualCount = events.filter((e) => e.category === category).length
+
       if (actualCount > 0) {
-        return actualCount + Math.floor(Math.random() * 2);
+        return actualCount + Math.floor(Math.random() * 2)
       } else {
-        const weight = categoryWeights[category as keyof typeof categoryWeights] || 1;
-        return Math.floor(Math.random() * 5 * weight) + 3;
+        const weight = categoryWeights[category as keyof typeof categoryWeights] || 1
+        return Math.floor(Math.random() * 5 * weight) + 3
       }
-    });
-    
-    return categoryCounts;
+    })
+
+    return categoryCounts
   },
-  
 
   enhanceOnlineVsOfflineData(events: Event[]): [number, number] {
-    let onlineCount = 0;
-    let inPersonCount = 0;
-    
-    events.forEach(event => {
-      if ('isOnline' in event && event.isOnline) {
-        onlineCount++;
-      } else {
-        inPersonCount++;
-      }
-    });
-    
-    if (onlineCount > 0 || inPersonCount > 0) {
-      onlineCount += Math.floor(Math.random() * 2);
-      inPersonCount += Math.floor(Math.random() * 2);
-    } else {
-      const total = 10;
-      onlineCount = Math.round(total * (0.6 + (Math.random() * 0.1 - 0.05)));
-      inPersonCount = total - onlineCount;
-    }
-    
-    return [onlineCount, inPersonCount];
-  },
-  
+    let onlineCount = 0
+    let inPersonCount = 0
 
-  generateWeightedDate(startDate: Date, endDate: Date): Date {
-    const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-    let dayOffset;
-    
-    if (Math.random() > 0.8) {
-      dayOffset = Math.floor(Math.random() * totalDays);
+    events.forEach((event) => {
+      if ("isOnline" in event && event.isOnline) {
+        onlineCount++
+      } else {
+        inPersonCount++
+      }
+    })
+
+    if (onlineCount > 0 || inPersonCount > 0) {
+      onlineCount += Math.floor(Math.random() * 2)
+      inPersonCount += Math.floor(Math.random() * 2)
     } else {
-      const r1 = Math.random();
-      const r2 = Math.random();
-      dayOffset = Math.floor((r1 + r2) / 2 * totalDays);
+      const total = 10
+      onlineCount = Math.round(total * (0.6 + (Math.random() * 0.1 - 0.05)))
+      inPersonCount = total - onlineCount
     }
-    
-    return addDays(startDate, dayOffset);
-  }
-};
+
+    return [onlineCount, inPersonCount]
+  },
+}
+

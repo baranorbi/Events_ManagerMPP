@@ -1,6 +1,20 @@
 <template>
   <AppLayout>
-    <div class="max-w-6xl mx-auto">
+    <div v-if="loading" class="flex justify-center py-12">
+      <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#533673]"></div>
+    </div>
+    
+    <div v-else-if="error" class="text-center py-12">
+      <p class="text-red-500">{{ error }}</p>
+      <button 
+        @click="loadUserEvents" 
+        class="mt-4 px-6 py-2 bg-[#533673] rounded-md text-white hover:bg-opacity-90 transition-colors"
+      >
+        Try Again
+      </button>
+    </div>
+    
+    <div v-else class="max-w-6xl mx-auto">
       <h1 class="text-4xl font-bold mb-6">Manage Events</h1>
       
       <!-- Statistics component -->
@@ -9,9 +23,9 @@
       <div class="flex justify-between items-center mb-8">
         <button 
           @click="showCreateEventModal = true"
-          class="px-6 py-3 bg-[#232323] rounded-md text-[#D9D9D9] hover:bg-[#333333] transition-colors border border-[#737373]"
+          class="mb-6 px-6 py-3 bg-[#533673] rounded-md text-white hover:bg-opacity-90 transition-colors"
         >
-          New Event
+          + New Event
         </button>
         
         <!-- Search and filters -->
@@ -28,6 +42,9 @@
             class="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#737373] hover:text-[#D9D9D9]"
           >
             <X :size="16" />
+          </button>
+          <button @click="debugShowEvents" class="px-3 py-1 bg-gray-600 text-xs rounded">
+            Debug: Check Store
           </button>
         </div>
         
@@ -46,6 +63,9 @@
       
       <!-- Highlighted Events Grid with pagination -->
       <div v-if="paginatedEvents.length > 0">
+        <div class="text-xs text-gray-400 mb-2">
+          Showing {{ filteredEvents.length }} of {{ userEvents.length }} events
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div 
             v-for="event in paginatedEvents" 
@@ -119,9 +139,9 @@
     
     <!-- Create Event Modal -->
     <CreateEventModal 
-      v-if="showCreateEventModal" 
-      @close="showCreateEventModal = false"
+      v-if="showCreateEventModal"
       @created="eventCreated"
+      @close="showCreateEventModal = false"
     />
     
     <!-- Edit Event Modal -->
@@ -162,16 +182,34 @@ const showCreateEventModal = ref(false);
 const showEditEventModal = ref(false);
 const showEventDetailsModal = ref(false);
 const selectedEventId = ref('');
+const loading = ref(true);
+const error = ref('');
 
 const currentPage = ref(1);
 const itemsPerPage = ref(9);
 
-onMounted(() => {
-  loadUserEvents();
+onMounted(async () => {
+  await loadUserEvents();
 });
 
-const loadUserEvents = () => {
-  userEvents.value = eventStore.getUserEvents();
+const debugShowEvents = async () => {
+  const events = await eventStore.getUserEvents();
+  console.log('Current events in store:', events);
+  alert(`Found ${events.length} events in the store`);
+};
+
+const loadUserEvents = async () => {
+  loading.value = true;
+  error.value = '';
+  
+  try {
+    userEvents.value = await eventStore.getUserEvents();
+  } catch (err) {
+    console.error('Failed to load user events:', err);
+    error.value = 'Failed to load your events. Please try again.';
+  } finally {
+    loading.value = false;
+  }
 };
 
 // search query
@@ -250,23 +288,48 @@ const openEventDetails = (eventId: string) => {
   showEventDetailsModal.value = true;
 };
 
-const eventCreated = () => {
-  loadUserEvents();
-};
-
-const eventUpdated = () => {
-  loadUserEvents();
-};
-
-const eventDeleted = (eventId: string) => {
-  const success = eventStore.deleteEvent(eventId);
+const eventCreated = async (newEventId: any) => {
+  console.log('Event created with ID:', newEventId);
   
-  if (success) {
-    loadUserEvents();
-    showEditEventModal.value = false;
-  } else {
-    console.error('Failed to delete event:', eventId);
-    alert('Failed to delete event. Please try again.');
+  try {
+    await loadUserEvents();
+    showCreateEventModal.value = false; // Close the modal here
+    alert('Event created successfully!');
+  } catch (error) {
+    console.error('Error refreshing events after creation:', error);
+    alert('Event may have been created but the display couldn\'t be refreshed. Please reload the page.');
+  }
+};
+
+
+const eventUpdated = async () => {
+  await loadUserEvents();
+};
+
+const eventDeleted = async (eventId: string) => {
+  try {
+    const result = await eventStore.deleteEvent(eventId);
+    
+    if (result.success) {
+      // Always reload events after successful deletion
+      await loadUserEvents();
+      
+      // Close the modal if it's open
+      showEditEventModal.value = false;
+      
+      // Show success notification
+      alert('Event deleted successfully.');
+    } else {
+      throw new Error(result.error || 'Unknown error deleting event');
+    }
+  } catch (error) {
+    console.error('Failed to delete event:', eventId, error);
+    
+    if (error instanceof Error) {
+      alert(`Failed to delete event: ${error.message}`);
+    } else {
+      alert('An error occurred while deleting the event. Please try again.');
+    }
   }
 };
 </script>
