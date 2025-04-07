@@ -94,7 +94,6 @@ class EventAPITestCase(TestCase):
         response = self.client.get(f'/api/events/?category={category1}')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # All returned events should be in category1
         for event in response.data:
             self.assertEqual(event['category'], category1)
         
@@ -102,12 +101,11 @@ class EventAPITestCase(TestCase):
         response = self.client.get('/api/events/?is_online=true')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # All returned events should be online
         for event in response.data:
             self.assertTrue(event['is_online'])
     
     def test_sort_events(self):
-        # Create events with different dates
+        # events with different dates
         event1 = {
             'title': 'A Event',
             'description': 'This is event A',
@@ -148,7 +146,7 @@ class EventAPITestCase(TestCase):
 class UserAPITestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user_id = 'user1'  # Using the pre-initialized user
+        self.user_id = 'user1'
     
     def test_get_user(self):
         response = self.client.get(f'/api/users/{self.user_id}/')
@@ -177,7 +175,6 @@ class UserAPITestCase(TestCase):
         self.assertTrue(isinstance(response.data, list))
     
     def test_add_to_interested(self):
-        # Create a test event
         event_data = {
             'title': 'Interesting Event',
             'description': 'This is an interesting event',
@@ -200,7 +197,6 @@ class UserAPITestCase(TestCase):
         self.assertIn(event_id, event_ids)
     
     def test_remove_from_interested(self):
-        # Get current interested events
         response = self.client.get(f'/api/users/{self.user_id}/interested/')
         if len(response.data) > 0:
             event_id = response.data[0]['id']

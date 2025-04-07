@@ -128,17 +128,14 @@ import AppLayout from '../components/AppLayout.vue';
 import FileUploader from '../components/FileUploader.vue';
 import type { UploadResult } from '../utils/fileUploadService';
 
-// Component state
 const useChunkedUpload = ref(false);
 const fileTypeFilter = ref('');
 const sizeLimit = ref(0); // No limit by default
 const selectedMedia = ref<UploadResult | null>(null);
 
-// Handle upload events
 const handleUploadComplete = (result: UploadResult) => {
   console.log('Upload complete:', result);
   
-  // Set as selected media for preview if it's a media file
   if (result.fileType?.startsWith('video/') || 
       result.fileType?.startsWith('audio/') || 
       result.fileType?.startsWith('image/')) {

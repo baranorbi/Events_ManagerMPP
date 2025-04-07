@@ -1,9 +1,8 @@
 import { ref, watch } from 'vue';
 import { useNetworkStatus } from '../utils/offlineDetector';
 import api from './api';
-import { v4 as uuidv4 } from 'uuid'; // Make sure to install uuid package
+import { v4 as uuidv4 } from 'uuid';
 
-// Types for our offline operations
 export type OperationType = 'create' | 'update' | 'delete';
 export type ResourceType = 'event' | 'user' | 'interested';
 
@@ -19,11 +18,9 @@ export interface PendingOperation {
   syncError?: string;
 }
 
-// Local storage keys
 const PENDING_OPS_KEY = 'events_manager_pending_ops';
 const OFFLINE_DATA_KEY = 'events_manager_offline_data';
 
-// Load pending operations from localStorage
 const loadPendingOperations = (): PendingOperation[] => {
   try {
     const stored = localStorage.getItem(PENDING_OPS_KEY);
@@ -34,7 +31,6 @@ const loadPendingOperations = (): PendingOperation[] => {
   }
 };
 
-// Save pending operations to localStorage
 const savePendingOperations = (operations: PendingOperation[]) => {
   try {
     localStorage.setItem(PENDING_OPS_KEY, JSON.stringify(operations));
@@ -43,7 +39,6 @@ const savePendingOperations = (operations: PendingOperation[]) => {
   }
 };
 
-// Load offline data from localStorage
 const loadOfflineData = () => {
   try {
     const stored = localStorage.getItem(OFFLINE_DATA_KEY);
@@ -54,7 +49,6 @@ const loadOfflineData = () => {
   }
 };
 
-// Save offline data to localStorage
 const saveOfflineData = (data: any) => {
   try {
     localStorage.setItem(OFFLINE_DATA_KEY, JSON.stringify(data));
@@ -66,18 +60,14 @@ const saveOfflineData = (data: any) => {
 export function useOfflineStore() {
   const { connectionStatus, isOnline, isServerReachable, lastChecked } = useNetworkStatus();
   
-  // Pending operations queue
   const pendingOperations = ref<PendingOperation[]>(loadPendingOperations());
   
-  // Offline data cache
   const offlineData = ref(loadOfflineData());
   
-  // Sync status
   const isSyncing = ref(false);
   const syncProgress = ref(0);
   const lastSyncTime = ref<Date | null>(null);
   
-  // Watch for changes and persist to localStorage
   watch(pendingOperations, (newValue) => {
     savePendingOperations(newValue);
   }, { deep: true });
@@ -86,7 +76,6 @@ export function useOfflineStore() {
     saveOfflineData(newValue);
   }, { deep: true });
   
-  // Add a new offline operation to the queue
   const queueOperation = (
     type: OperationType,
     resource: ResourceType,
@@ -108,10 +97,8 @@ export function useOfflineStore() {
     
     pendingOperations.value.push(operation);
     
-    // Also apply the operation to our local data
     applyOperationLocally(operation);
     
-    // If we're online and server is reachable, attempt to sync immediately
     if (connectionStatus.value === 'online') {
       syncPendingOperations();
     }
@@ -119,13 +106,11 @@ export function useOfflineStore() {
     return operationId;
   };
   
-  // Apply an operation to our local cache
   const applyOperationLocally = (operation: PendingOperation) => {
     const { type, resource, resourceId, data } = operation;
     
     if (resource === 'event') {
       if (type === 'create') {
-        // For create, generate a temporary ID if one isn't provided
         const tempId = data.id || `temp-${uuidv4()}`;
         const event = {
           ...data,
@@ -135,7 +120,6 @@ export function useOfflineStore() {
         offlineData.value.events.push(event);
       } 
       else if (type === 'update' && resourceId) {
-        // For update, find the existing event and update its properties
         const index = offlineData.value.events.findIndex((e: any) => e.id === resourceId);
         if (index !== -1) {
           offlineData.value.events[index] = {
@@ -146,7 +130,6 @@ export function useOfflineStore() {
         }
       } 
       else if (type === 'delete' && resourceId) {
-        // For delete, filter out the event
         offlineData.value.events = offlineData.value.events.filter(
           (e: any) => e.id !== resourceId
         );
@@ -176,13 +159,11 @@ export function useOfflineStore() {
       }
     }
     else if (resource === 'interested') {
-      // Initialize interested array if it doesn't exist
       if (!offlineData.value.interested) {
         offlineData.value.interested = [];
       }
       
       if (type === 'create' && data) {
-        // For adding to interested list
         offlineData.value.interested.push({
           userId: data.userId,
           eventId: data.eventId,
@@ -190,7 +171,6 @@ export function useOfflineStore() {
         });
       } 
       else if (type === 'delete' && data) {
-        // For removing from interested list
         offlineData.value.interested = offlineData.value.interested.filter(
           (i: any) => !(i.userId === data.userId && i.eventId === data.eventId)
         );
@@ -198,7 +178,6 @@ export function useOfflineStore() {
     }
   };
 
-  // Sync all pending operations with the server
   const syncPendingOperations = async () => {
     if (isSyncing.value || connectionStatus.value !== 'online') {
       return;
@@ -216,7 +195,6 @@ export function useOfflineStore() {
     
     let successCount = 0;
     
-    // Group operations by resource for better syncing
     const operationsByResource: Record<string, PendingOperation[]> = {};
     
     unsyncedOperations.forEach(op => {
@@ -228,7 +206,6 @@ export function useOfflineStore() {
     });
     
     for (const [, operations] of Object.entries(operationsByResource)) {
-      // Sort operations by timestamp (oldest first)
       operations.sort((a, b) => a.timestamp - b.timestamp);
       
       for (const operation of operations) {
@@ -236,11 +213,9 @@ export function useOfflineStore() {
           const success = await syncOperation(operation);
           
           if (success) {
-            // Mark as synced if successful
             operation.synced = true;
             successCount++;
           } else {
-            // Increment retry count if failed
             operation.retryCount++;
           }
         } catch (error) {
@@ -249,12 +224,10 @@ export function useOfflineStore() {
           operation.syncError = error instanceof Error ? error.message : 'Unknown error';
         }
         
-        // Update progress
         syncProgress.value = Math.round((successCount / unsyncedOperations.length) * 100);
       }
     }
     
-    // After all operations are processed, clean up the ones that synced
     if (successCount > 0) {
       pendingOperations.value = pendingOperations.value.filter(op => !op.synced);
     }
@@ -263,52 +236,44 @@ export function useOfflineStore() {
     isSyncing.value = false;
   };
   
-  // Sync a single operation with the server
   const syncOperation = async (operation: PendingOperation): Promise<boolean> => {
     const { type, resource, resourceId, data } = operation;
     
     try {
       if (resource === 'event') {
         if (type === 'create') {
-          // Create new event
           const response = await api.post('/events/', data);
           return response.status >= 200 && response.status < 300;
         } 
         else if (type === 'update' && resourceId) {
-          // Update existing event
           const response = await api.patch(`/events/${resourceId}/`, data);
           return response.status >= 200 && response.status < 300;
         } 
         else if (type === 'delete' && resourceId) {
-          // Delete event
           const response = await api.delete(`/events/${resourceId}/`);
           return response.status >= 200 && response.status < 300;
         }
       }
       else if (resource === 'interested') {
         if (type === 'create' && data) {
-          // Add to interested list
           const response = await api.post(`/users/${data.userId}/interested/`, { 
             event_id: data.eventId 
           });
           return response.status >= 200 && response.status < 300;
         } 
         else if (type === 'delete' && data) {
-          // Remove from interested list
           const response = await api.delete(`/users/${data.userId}/interested/${data.eventId}/`);
           return response.status >= 200 && response.status < 300;
         }
       }
-      // Add other resource types as needed
       
-      return false; // Operation type not supported
+      return false;
     } catch (error) {
       console.error('Error during sync operation:', error);
       return false;
     }
   };
   
-  // Watch for online status changes to trigger sync
   watch(connectionStatus, (newStatus) => {
     if (newStatus === 'online') {
       syncPendingOperations();
@@ -316,7 +281,6 @@ export function useOfflineStore() {
   });
   
   return {
-    // State
     pendingOperations,
     offlineData,
     isSyncing,
@@ -327,7 +291,6 @@ export function useOfflineStore() {
     isServerReachable,
     lastChecked,
     
-    // Actions
     queueOperation,
     syncPendingOperations,
   };

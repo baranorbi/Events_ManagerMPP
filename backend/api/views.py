@@ -16,17 +16,14 @@ import uuid
 import mimetypes
 
 
-# Create media directory if it doesn't exist
 if not os.path.exists(os.path.join(settings.BASE_DIR, 'media')):
     os.makedirs(os.path.join(settings.BASE_DIR, 'media'))
 
-# Create upload directory if it doesn't exist
 if not os.path.exists(os.path.join(settings.BASE_DIR, 'media', 'uploads')):
     os.makedirs(os.path.join(settings.BASE_DIR, 'media', 'uploads'))
 
 class EventListView(APIView):
     def get(self, request):
-        # Check if pagination is requested
         page = request.query_params.get('page', '1')
         page_size = request.query_params.get('page_size', '12')
         
@@ -37,14 +34,12 @@ class EventListView(APIView):
             page = 1
             page_size = 12
         
-        # Get filters if any
         filter_serializer = EventFilterSerializer(data=request.query_params)
         filters = None
         
         if filter_serializer.is_valid():
             filters = filter_serializer.validated_data
         
-        # Get paginated results
         if 'pagination' in request.query_params and request.query_params['pagination'] == 'true':
             paginated_data = memory_store.get_paginated_events(page, page_size, filters)
             
@@ -60,11 +55,9 @@ class EventListView(APIView):
                 }
             })
         
-        # Otherwise handle as before
         if filters:
             events = memory_store.filter_events(filters)
             
-            # Sort if requested
             sort_by = filters.get('sort_by', '')
             sort_order = filters.get('sort_order', 'asc')
             if sort_by:
@@ -78,7 +71,6 @@ class EventListView(APIView):
     def post(self, request):
         serializer = EventSerializer(data=request.data)
         if serializer.is_valid():
-            # Convert date string to datetime object if needed
             validated_data = serializer.validated_data
             if isinstance(validated_data.get('date'), str):
                 validated_data['date'] = datetime.strptime(validated_data['date'], '%Y-%m-%d').date()
@@ -197,17 +189,13 @@ class FileUploadView(APIView):
         if not file_obj:
             return Response({'error': 'No file was provided'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create a unique filename
         filename, ext = os.path.splitext(file_obj.name)
         unique_filename = f"{filename}_{uuid.uuid4().hex}{ext}"
         
-        # Save the file
         file_path = os.path.join('uploads', unique_filename)
         
-        # Use Django's default storage to save the file
         file_path = default_storage.save(file_path, ContentFile(file_obj.read()))
         
-        # Get absolute URL
         file_url = request.build_absolute_uri(settings.MEDIA_URL + file_path)
         
         return Response({
@@ -218,7 +206,6 @@ class FileUploadView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 class ChunkedFileUploadView(APIView):
-    """Endpoint for handling chunked uploads of large files"""
     parser_classes = (MultiPartParser,)
     
     def post(self, request):
@@ -231,42 +218,37 @@ class ChunkedFileUploadView(APIView):
         if not chunk or not filename:
             return Response({"error": "Missing chunk or filename"}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create temp directory for chunks if it doesn't exist
+        # temp directory for chunks if it doesn't exist
         chunks_dir = os.path.join(settings.BASE_DIR, 'media', 'chunks', file_id)
         if not os.path.exists(chunks_dir):
             os.makedirs(chunks_dir, exist_ok=True)
         
-        # Save this chunk
+        # save this chunk
         chunk_path = os.path.join(chunks_dir, f'chunk_{chunk_number}')
         with open(chunk_path, 'wb+') as destination:
             for chunk_data in chunk.chunks():
                 destination.write(chunk_data)
         
-        # Check if all chunks are uploaded
+        # if all chunks are uploaded
         if chunk_number == total_chunks - 1:
-            # All chunks received, combine them
+            # combine them
             final_path = os.path.join(settings.BASE_DIR, 'media', 'uploads', filename)
             
-            # Ensure uploads directory exists
             os.makedirs(os.path.dirname(final_path), exist_ok=True)
             
-            # Combine all chunks
             with open(final_path, 'wb+') as final_file:
                 for i in range(total_chunks):
                     chunk_file_path = os.path.join(chunks_dir, f'chunk_{i}')
                     with open(chunk_file_path, 'rb') as chunk_file:
                         final_file.write(chunk_file.read())
             
-            # Clean up chunks
+            # clean up chunks
             shutil.rmtree(chunks_dir)
             
-            # Get file URL
             file_url = request.build_absolute_uri(settings.MEDIA_URL + 'uploads/' + filename)
             
-            # Get file size
             file_size = os.path.getsize(final_path)
             
-            # Get file type
             file_type, _ = mimetypes.guess_type(final_path)
             if not file_type:
                 file_type = 'application/octet-stream'
@@ -290,30 +272,24 @@ class FileDownloadView(APIView):
     """Endpoint for downloading files with streaming support for large files"""
     
     def get(self, request, filename):
-        # Construct the file path
         file_path = os.path.join(settings.BASE_DIR, 'media', 'uploads', filename)
         
         if not os.path.exists(file_path):
             return HttpResponseNotFound('File not found')
         
-        # Get file size
         file_size = os.path.getsize(file_path)
         
-        # Determine content type
         content_type, _ = mimetypes.guess_type(file_path)
         if not content_type:
             content_type = 'application/octet-stream'
         
-        # Open the file
         file_handle = open(file_path, 'rb')
         
-        # Create a file response with streaming
         response = FileResponse(
             FileWrapper(file_handle),
             content_type=content_type
         )
         
-        # Set content disposition header
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         response['Content-Length'] = file_size
         

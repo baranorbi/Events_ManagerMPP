@@ -38,8 +38,7 @@
             </div>
           </div>
         </div>
-
-        <!-- Other filters remain the same -->
+        <!-- Sort by dropdown -->
         <div class="relative sort-dropdown">
             <button 
               @click="showSortDropdown = !showSortDropdown"
@@ -238,7 +237,6 @@ const toggleCategoryDropdown = () => {
   showCategoryDropdown.value = !showCategoryDropdown.value;
 };
 
-// Infinite scrolling state
 const pageSize = 12; // Number of items to load at once
 const currentPage = ref(1);
 const hasMoreItems = ref(true);
@@ -311,10 +309,9 @@ onMounted(() => {
   
   window.addEventListener('scroll', checkForMore, { passive: true });
   
-  // Initial check
   setTimeout(checkForMore, 500);
   
-  // Also check periodically
+  // check periodically
   const intervalId = setInterval(() => {
     if (hasMoreItems.value && displayedEvents.value.length > pageSize * 2) {
       removeTopItems(pageSize);
@@ -327,18 +324,14 @@ onMounted(() => {
   });
 });
 
-// Intersection observer
 let observer: IntersectionObserver | null = null;
 
-// Initialize and create the observer for infinite scrolling
 const createScrollObserver = () => {
-  // First disconnect any existing observer
   if (observer) {
     observer.disconnect();
     observer = null;
   }
   
-  // Wait for the DOM to be ready
   nextTick(() => {
     if (!loadMoreTrigger.value) return;
     
@@ -367,7 +360,6 @@ onMounted(() => {
 });
 
 onMounted(async () => {
-  // Set wider date range to include all generated events
   const startDate = new Date();
   startDate.setFullYear(startDate.getFullYear() - 1); // One year ago
   
@@ -378,13 +370,10 @@ onMounted(async () => {
   filters.value.endDate = formatDate(endDate);
   
   
-  // First load of events
   await loadEvents();
   
-  // Setup intersection observer after events are loaded
   createScrollObserver();
   
-  // Show event details if eventId is in the URL
   if (route.query.eventId) {
     selectedEventId.value = route.query.eventId as string;
     showEventDetailsModal.value = true;
@@ -394,7 +383,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  // Clean up the observer and event listeners
   if (observer) {
     observer.disconnect();
   }
@@ -404,19 +392,16 @@ onUnmounted(() => {
 const handleOutsideClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
   
-  // Close calendar if clicking outside of it
   if (showCalendar.value && 
       !target.closest('.calendar-container') && 
       !target.closest('button[data-calendar-toggle]')) {
     showCalendar.value = false;
   }
   
-  // Close sort dropdown if clicking outside of it
   if (showSortDropdown.value && !target.closest('.sort-dropdown')) {
     showSortDropdown.value = false;
   }
   
-  // Close category dropdown if clicking outside of it
   if (showCategoryDropdown.value && !target.closest('.category-dropdown')) {
     showCategoryDropdown.value = false;
   }
@@ -427,7 +412,6 @@ const loadEvents = async () => {
   error.value = '';
   
   try {
-    // Build filter options - without pagination parameters to avoid duplication
     const filterOptions = {
       category: filters.value.category !== 'All categories' ? filters.value.category : undefined,
       startDate: filters.value.startDate || undefined,
@@ -438,28 +422,22 @@ const loadEvents = async () => {
       sortOrder: filters.value.sortOrder || 'desc'
     };
     
-    // Get paginated data
     const paginatedData = await eventStore.getEventsPaginated(1, pageSize, filterOptions);
     
-    // Store pagination response for debugging
     lastPaginationResponse.value = JSON.stringify(paginatedData.pagination, null, 2);
     
     if (paginatedData && paginatedData.events) {
-      // Convert API response data to proper Event objects
       const events = paginatedData.events.map(toClientFormat);
       
-      // Reset pagination
       currentPage.value = 1;
       displayedEvents.value = events;
       hasMoreItems.value = !!paginatedData.pagination.has_next;
       totalEvents.value = paginatedData.pagination.total_events;
             
-      // Make sure we set up the observer after data is loaded
       await nextTick();
       if (infiniteScrollRef.value) {
         infiniteScrollRef.value.createObserver();
         
-        // Also check visibility after a short delay to trigger loading if needed
         setTimeout(() => {
           if (infiniteScrollRef.value) {
             infiniteScrollRef.value.checkSentinelVisibility();
@@ -486,13 +464,11 @@ const heightBeforeRemoval = ref(0);
 const removingCooldown = ref(false);
 const loadingCooldown = ref(false);
 
-// Replace your loadMoreItems function with this smarter version
 const loadMoreItems = async () => {
   if (isLoadingMore.value || !hasMoreItems.value || !isComponentMounted.value || loadingCooldown.value) {
     return;
   }
   
-  // Set cooldown to prevent rapid loading
   loadingCooldown.value = true;
   setTimeout(() => {
     loadingCooldown.value = false;
@@ -508,21 +484,17 @@ const loadMoreItems = async () => {
       sortOrder: filters.value.sortOrder || 'desc'
     };
     
-    // Get event data for the next page
     const response = await eventStore.getEventsPaginated(nextPage, pageSize, options);
     
     if (response && response.events && response.events.length > 0) {
-      // Record document height and scroll position before adding new items
       const beforeHeight = document.documentElement.scrollHeight;
       lastScrollY.value = window.scrollY;
       
-      // Append new events to displayed events
       displayedEvents.value = [...displayedEvents.value, ...response.events];
       totalEvents.value = response.pagination.total_events;
       currentPage.value = nextPage;
       hasMoreItems.value = response.pagination.has_next;
 
-      // Check if we should remove items from the top
       nextTick(() => {
         checkIfShouldRemoveTop();
       });
@@ -537,53 +509,40 @@ const loadMoreItems = async () => {
 };
 
 const checkIfShouldRemoveTop = () => {
-  // Only remove items if:
-  // 1. We have more than our defined window size
-  // 2. User has scrolled down at least one page worth
-  // 3. We're not currently in a removal cooldown
   if (displayedEvents.value.length <= windowSize.value || 
-      window.scrollY < pageSize * 100 || // Rough estimate - assuming each item ~100px
+      window.scrollY < pageSize * 100 ||
       removingCooldown.value) {
     return;
   }
   
-  // Mark that we're in removal cooldown to prevent rapid removals
   removingCooldown.value = true;
   
-  // Capture current position information
   heightBeforeRemoval.value = document.documentElement.scrollHeight;
   const scrollYBeforeRemoval = window.scrollY;
   
-  // Remove one page worth of items from the top
   const itemsToRemove = pageSize;
   const oldEvents = [...displayedEvents.value];
   displayedEvents.value = displayedEvents.value.slice(itemsToRemove);
   
-  // After removal, we need to adjust scroll position to keep user's view stable
   nextTick(() => {
-    // Calculate how much height was lost
     const newHeight = document.documentElement.scrollHeight;
     const heightDifference = heightBeforeRemoval.value - newHeight;
     
-    // Adjust scroll position to compensate for removed items
     if (heightDifference > 0) {
       window.scrollTo({
         top: Math.max(0, scrollYBeforeRemoval - heightDifference),
-        behavior: 'auto' // Use 'auto' not 'smooth' for better UX during removal
+        behavior: 'auto'
       });
     }
     
-    // Reset cooldown after a delay
     setTimeout(() => {
       removingCooldown.value = false;
-    }, 2000); // 2 second cooldown between removals
+    }, 2000); // 2 seconds cooldown
   });
 };
 
-// Add a scroll position tracking function
 onMounted(() => {
   const handleScroll = () => {
-    // Check if we're near the bottom
     const scrollY = window.scrollY;
     const windowHeight = window.innerHeight;
     const documentHeight = document.documentElement.scrollHeight;
@@ -603,21 +562,17 @@ onMounted(() => {
   });
 });
 
-// Update the removeTopItems function
 const removeTopItems = (count: number) => {
-  // Don't remove items until we have at least 3 pages worth
   if (!displayedEvents.value || displayedEvents.value.length <= pageSize * 3) {
     return;
   }
   
-  // Keep at least 2 full pages of items
   const minimumKeep = pageSize * 2;
   const itemsToRemove = Math.min(count, displayedEvents.value.length - minimumKeep);
   
   if (itemsToRemove <= 0) {
     return;
   }
-  // Create a new array with items removed
   displayedEvents.value = displayedEvents.value.slice(itemsToRemove);
 };
 
@@ -685,11 +640,9 @@ const applyFilters = async () => {
       page_size: pageSize
     };
     
-    // Get first page with pagination data
     const paginatedData = await eventStore.getEventsPaginated(1, pageSize, filterOptions);
     
     if (paginatedData && paginatedData.events) {
-      // Convert API response data to proper Event objects
       const events = paginatedData.events.map((event: any) => ({
         ...event,
         id: event.id,
@@ -705,13 +658,11 @@ const applyFilters = async () => {
         image: event.image
       }));
       
-      // Reset pagination
       currentPage.value = 1;
       displayedEvents.value = events;
       hasMoreItems.value = paginatedData.pagination.has_next;
       totalEvents.value = paginatedData.pagination.total_events;
       
-      // Re-create the scroll observer after filter application
       nextTick(() => {
         createScrollObserver();
       });
@@ -791,7 +742,6 @@ const handleDateRangeSelection = (dateRange: { startDate: Date, endDate: Date })
 
 const { connectionStatus } = useOfflineStore();
 
-// Ensure we have the document event listener for click outside
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick);
 });

@@ -183,19 +183,16 @@ onBeforeUnmount(() => {
 });
 
 const closeOnOutsideClick = (event: MouseEvent) => {
-  // First check if component is still mounted
   if (!isMounted.value) {
     return;
   }
   
   const target = event.target as HTMLElement;
   
-  // Check if target is still in document
   if (!document.body.contains(target)) {
     return;
   }
   
-  // Check for random event modal
   if (showRandomEventModal.value && !target.closest('.modal-container')) {
     showRandomEventModal.value = false;
   }
@@ -211,7 +208,6 @@ const toggleAuth = () => {
 };
 
 const handleSearch = () => {
-  // Navigate to home page with search query if not already there
   if (route.path !== '/') {
     router.push({
       path: '/',
@@ -219,19 +215,16 @@ const handleSearch = () => {
     });
   }
   
-  // Always emit the search event for the current page to handle
   emit('search', searchQuery.value);
 };
 
 const clearSearch = () => {
   searchQuery.value = '';
   
-  // Navigate to home page without search query if not already there
   if (route.path !== '/') {
     router.push('/');
   }
   
-  // Always emit the empty search event
   emit('search', '');
 };
 

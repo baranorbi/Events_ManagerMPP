@@ -106,6 +106,7 @@ import { chartDataGenerator } from '../utils/dataGenerator';
 import axios from 'axios';
 import websocketService from '../utils/websocketService';
 
+
 const chartContainer = ref(null);
 const categoryChartCanvas = ref<HTMLCanvasElement | null>(null);
 const timelineChartCanvas = ref<HTMLCanvasElement | null>(null);
@@ -151,23 +152,18 @@ const tryAgain = () => {
 onMounted(() => {
   loadDataAndInitCharts();
   
-  // Connect to WebSocket if not already connected
   if (!websocketService.isConnected.value) {
     websocketService.connect();
   }
   
-  // Set up reactive bindings
   isWebSocketConnected.value = websocketService.isConnected.value;
   isGeneratingEvents.value = websocketService.isGenerating.value;
   
-  // Watch for changes in the websocketService state
   websocketService.isConnected.value = isWebSocketConnected.value;
   websocketService.isGenerating.value = isGeneratingEvents.value;
   
-  // Listen for event updates
   websocketService.on('event_update', handleEventUpdate);
   
-  // Set up periodic refresh interval
   refreshInterval = window.setInterval(() => {
     refreshChartData(false);
   }, 30000);
@@ -180,7 +176,6 @@ const loadDataAndInitCharts = async () => {
   try {
     await loadEvents();
     
-    // ensure DOM is fully rendered
     setTimeout(() => {
       initCharts();
       loading.value = false;
@@ -210,7 +205,6 @@ onBeforeUnmount(() => {
 
 const loadEvents = async () => {
   try {
-    // Use the store method instead of direct API call
     const allEvents = await eventStore.getAllEvents();
     console.log('All events loaded:', allEvents.length);
     
@@ -387,12 +381,9 @@ const updateCharts = () => {
   }
   
   try {
-    // Ensure all events have correct property names before processing
     const currentEvents = events.value.map(event => {
-      // Make sure isOnline is properly converted to boolean
       const processedEvent = { ...event };
       
-      // Explicitly normalize isOnline field to boolean
       if (typeof processedEvent.isOnline !== 'boolean') {
         const isOnlineValue = 
           processedEvent.isOnline === true || 
@@ -406,7 +397,6 @@ const updateCharts = () => {
       return processedEvent;
     });
     
-    // Now use the cleaned events for chart updates
     if (categoryChart) {
       updateCategoryChart(currentEvents);
     }
@@ -440,7 +430,6 @@ const refreshChartData = async (showLoading = true) => {
       return;
     }
     
-    // Debug to check for duplicated events
     const titles = events.value.map(e => e.title);
     const titleCounts = titles.reduce<Record<string, number>>((acc, title) => {
       acc[title] = (acc[title] || 0) + 1;
@@ -454,14 +443,12 @@ const refreshChartData = async (showLoading = true) => {
     if (duplicates.length > 0) {
       console.warn('Duplicate events found:', duplicates.join(', '));
     }
-    // Check for online events
     const onlineEvents = events.value.filter(e => e.isOnline === true);
     const onlineLocations = onlineEvents.map(e => e.location);
     console.log(`Found ${onlineEvents.length} online events out of ${events.value.length} total`);
     console.log('Online event locations:', [...new Set(onlineLocations)]);
     console.log('Online event sample:', onlineEvents.slice(0, 3));
 
-    // Verify data quality
     const inconsistentEvents = events.value.filter(e => 
       (e.isOnline === true && e.location !== 'Remote') || 
       (e.isOnline === false && e.location === 'Remote')
@@ -471,11 +458,9 @@ const refreshChartData = async (showLoading = true) => {
       console.log('First few inconsistent events:', inconsistentEvents.slice(0, 3));
     }
 
-    // Continue with chart updates
     if (categoryChart && timelineChart && onlineVsOfflineChart) {
       console.log('Updating charts with new data...');
       
-      // Do a complete refresh
       destroyCharts();
       await nextTick();
       initCharts();
@@ -499,9 +484,7 @@ const updateCategoryChart = (events: Event[]) => {
   }
   
   const allCategories = eventStore.getCategories().filter(c => c !== 'All categories');
-  console.log('Categories:', allCategories);
   const categoryCounts = chartDataGenerator.enhanceCategoryData(events, allCategories);
-  console.log('Category counts:', categoryCounts);
   
   categoryChart.data.labels = [...allCategories];
   categoryChart.data.datasets[0].data = [...categoryCounts];
@@ -517,7 +500,6 @@ const updateTimelineChart = (events: Event[]) => {
   }
   
   const timelineData = chartDataGenerator.enhanceTimelineData(events);
-  console.log('Timeline data:', timelineData);
   
   timelineChart.data.labels = timelineData.labels;
   timelineChart.data.datasets[0].data = timelineData.data;
@@ -532,7 +514,6 @@ const updateOnlineVsOfflineChart = (events: Event[]) => {
   }
 
   const [onlineCount, inPersonCount] = chartDataGenerator.enhanceOnlineVsOfflineData(events);
-  console.log('Chart counts - Online:', onlineCount, 'In-person:', inPersonCount);
   
   onlineVsOfflineChart.data.datasets[0].data = [onlineCount, inPersonCount];
   onlineVsOfflineChart.update();
@@ -562,7 +543,6 @@ const generateMoreData = async () => {
             category: newEvent.category || 'Conference',
             location: newEvent.location || 'Remote',
             is_online: newEvent.isOnline || false,
-            // Properly format the date from the generated event
             date: newEvent.date instanceof Date ? 
                   newEvent.date.toISOString().split('T')[0] : 
                   (typeof newEvent.date === 'string' ? 
@@ -570,7 +550,6 @@ const generateMoreData = async () => {
             created_by: userId
           };
           
-          console.log('Creating event with data:', eventToCreate);
           await eventStore.createEvent(eventToCreate);
           successCount++;
         } catch (e) {
@@ -600,15 +579,12 @@ const generateMoreData = async () => {
   }
 };
 
-// Handle real-time event updates
 const handleEventUpdate = (data: any) => {
   if (data.action === 'created') {
-    // A new event was created, refresh the charts
     refreshChartData(false);
   }
 };
 
-// Add toggleEventGeneration function
 const toggleEventGeneration = () => {
   if (isGeneratingEvents.value) {
     websocketService.stopEventGeneration();

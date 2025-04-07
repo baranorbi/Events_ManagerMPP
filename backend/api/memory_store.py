@@ -2,7 +2,6 @@ from datetime import datetime, date
 import json
 from typing import Dict, List, Optional, Any, Union
 
-# In-memory data store
 class MemoryStore:
     _instance = None
     
@@ -126,7 +125,6 @@ class MemoryStore:
             'user1': ['2', '4', '6']
         }
     
-    # Event methods
     def get_all_events(self) -> List[Dict]:
         return list(self.events.values())
     
@@ -134,17 +132,14 @@ class MemoryStore:
         return self.events.get(event_id)
     
     def create_event(self, event_data: Dict) -> Dict:
-        # Include milliseconds to reduce chance of ID collision
         event_id = str(int(datetime.now().timestamp() * 1000))
         event_data['id'] = event_id
         
-        # Convert date string to proper format if needed
         if 'date' in event_data and isinstance(event_data['date'], datetime):
             event_data['date'] = event_data['date'].strftime('%Y-%m-%d')
         
         self.events[event_id] = event_data
         
-        # Add to user's events if created_by is provided
         if 'created_by' in event_data:
             user_id = event_data['created_by']
             if user_id not in self.user_events:
@@ -158,13 +153,11 @@ class MemoryStore:
         if event_id not in self.events:
             return None
         
-        # Convert date string to proper format if needed
         if 'date' in event_data and isinstance(event_data['date'], datetime):
             event_data['date'] = event_data['date'].strftime('%Y-%m-%d')
         
-        # Update only the provided fields
         for key, value in event_data.items():
-            if key != 'id':  # Don't allow changing the ID
+            if key != 'id':
                 self.events[event_id][key] = value
         
         return self.events[event_id]
@@ -173,16 +166,13 @@ class MemoryStore:
         if event_id not in self.events:
             return False
         
-        # Remove from events
         event = self.events.pop(event_id)
         
-        # Remove from user's events
         if 'created_by' in event:
             user_id = event['created_by']
             if user_id in self.user_events and event_id in self.user_events[user_id]:
                 self.user_events[user_id].remove(event_id)
         
-        # Remove from interested events
         for user_id, events in self.interested_events.items():
             if event_id in events:
                 events.remove(event_id)
@@ -219,22 +209,19 @@ class MemoryStore:
                 search_query in event['category'].lower()
             ]
         
-        # Apply sorting if specified in filters
         if 'sort_by' in filters and filters['sort_order']:
             filtered_events = self.sort_events(filtered_events, filters['sort_by'], filters['sort_order'])
         
         return filtered_events
 
     def _get_date_obj(self, date_val):
-        """Convert various date formats to datetime.date for comparison."""
         if isinstance(date_val, str):
             return datetime.strptime(date_val, '%Y-%m-%d').date()
         elif isinstance(date_val, datetime):
             return date_val.date()
-        elif isinstance(date_val, date):  # Now date is properly defined
+        elif isinstance(date_val, date):
             return date_val
         else:
-            # Return a default date to avoid errors
             print(f"Warning: Unknown date format: {type(date_val)}, value: {date_val}")
             return datetime.now().date()
         
@@ -257,11 +244,9 @@ class MemoryStore:
         
         return events
     
-    # User methods
     def get_user(self, user_id: str) -> Optional[Dict]:
         user = self.users.get(user_id)
         if user:
-            # Don't return password
             user_copy = user.copy()
             if 'password' in user_copy:
                 del user_copy['password']
@@ -308,7 +293,6 @@ class MemoryStore:
     def authenticate_user(self, email: str, password: str) -> Optional[Dict]:
         for user_id, user in self.users.items():
             if user.get('email') == email and user.get('password') == password:
-                # Don't return password
                 user_copy = user.copy()
                 if 'password' in user_copy:
                     del user_copy['password']
@@ -319,12 +303,10 @@ class MemoryStore:
         if user_id not in self.users:
             return None
         
-        # Update only the provided fields
         for key, value in user_data.items():
-            if key != 'id' and key != 'password':  # Don't allow changing ID or password this way
+            if key != 'id' and key != 'password':
                 self.users[user_id][key] = value
         
-        # Don't return password
         user_copy = self.users[user_id].copy()
         if 'password' in user_copy:
             del user_copy['password']
@@ -332,35 +314,30 @@ class MemoryStore:
         return user_copy
     
     def get_paginated_events(self, page=1, page_size=10, filters=None):
-        # First apply filters if any
         if filters:
             events = self.filter_events(filters)
         else:
             events = list(self.events.values())
         
-        # Calculate pagination
+        # calc pagination
         total_events = len(events)
         total_pages = (total_events + page_size - 1) // page_size
         
-        # Ensure page is within valid range
+        # within valid range
         page = max(1, min(page, total_pages if total_pages > 0 else 1))
         
-        # Get the slice for the requested page
+        # slice for the requested page
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
-        
-        # Debug output
-        print(f"Pagination: page={page}, page_size={page_size}, total_events={total_events}, start_idx={start_idx}, end_idx={end_idx}")
         
         return {
             'events': events[start_idx:end_idx],
             'total_events': total_events,
             'total_pages': total_pages,
-            'current_page': page,  # Make sure this is the requested page, not hardcoded to 1
+            'current_page': page,
             'page_size': page_size,
             'has_next': page < total_pages,
             'has_previous': page > 1
         }
 
-# Create a singleton instance
 memory_store = MemoryStore()

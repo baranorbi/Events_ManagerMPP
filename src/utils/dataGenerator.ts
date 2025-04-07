@@ -12,19 +12,15 @@ export const chartDataGenerator = {
     const usableCategories = categories.length > 0 ? categories : fallbackCategories
     const usableLocations = locations.length > 0 ? locations : fallbackLocations
 
-    // Get today and ensure future dates
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Start date should be at least tomorrow to avoid validation errors
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
-    // End date is 6 months in the future
     const endDate = new Date(today)
     endDate.setMonth(today.getMonth() + 6)
 
-    // Create a base timestamp outside the loop
     const baseTimestamp = Date.now()
 
     for (let i = 0; i < additionalCount; i++) {
@@ -36,18 +32,12 @@ export const chartDataGenerator = {
       const isOnline = Math.random() > 0.5
       const category = usableCategories[Math.floor(Math.random() * usableCategories.length)]
 
-      // Generate a random date between tomorrow and endDate (ensuring future dates)
       const timeDiff = endDate.getTime() - tomorrow.getTime()
       const randomTime = Math.random() * timeDiff
       const eventDate = new Date(tomorrow.getTime() + randomTime)
 
-      // Format the date as ISO string (YYYY-MM-DD)
       const formattedDate = eventDate.toISOString().split("T")[0]
 
-      // Create a truly unique ID by:
-      // 1. Using base timestamp to keep time precision
-      // 2. Adding the index to ensure uniqueness within the batch
-      // 3. Adding a random number to avoid collisions between batches
       const uniqueId = `generated-${baseTimestamp}-${i}-${Math.floor(Math.random() * 10000)}`
 
       enhancedEvents.push({

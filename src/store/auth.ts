@@ -10,7 +10,6 @@ interface User {
 const currentUser = ref<User | null>(null);
 const isAuthenticated = ref(false);
 
-// Try to load auth state from localStorage for persistence between page refreshes
 try {
   const savedAuth = localStorage.getItem('auth');
   if (savedAuth) {

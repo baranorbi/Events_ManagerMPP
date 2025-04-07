@@ -155,16 +155,13 @@ const formatDate = (date: Date) => {
 
 const formatTime = (time: string) => {
   try {
-    // Handle different time formats
     if (time.includes('T')) {
-      // ISO format
       const date = new Date(time);
       return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit'
       });
     } else if (time.includes(':')) {
-      // HH:MM format
       const [hours, minutes] = time.split(':');
       const date = new Date();
       date.setHours(parseInt(hours), parseInt(minutes));
@@ -180,16 +177,13 @@ const formatTime = (time: string) => {
   }
 };
 
-// Check if this is the user's own event
 const isUserEvent = computed(() => {
   const userId = authStore.getUser()?.id;
   return event.value.createdBy === userId;
 });
 
-// Reactive variable to store if user is interested in the event
 const isInterested = ref(false);
 
-// Check if the event is in the user's interested list
 const checkIfInterested = async () => {
   if (!authStore.checkAuth()) return;
   

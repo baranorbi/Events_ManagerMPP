@@ -1,13 +1,11 @@
 export const toApiFormat = (event : any) => {
-  // Strip duplicate fields and normalize to API format
   const {
-    isOnline, startTime, endTime, createdBy, // Remove client-side props
-    is_online, start_time, end_time, created_by, // Remove duplicate API props too
-    _offlineCreated, // Remove internal tracking props
+    isOnline, startTime, endTime, createdBy,
+    is_online, start_time, end_time, created_by,
+    _offlineCreated,
     ...rest
   } = event;
   
-  // Clean, normalized API format
   return {
     ...rest,
     is_online: isOnline ?? is_online ?? false,
@@ -18,13 +16,11 @@ export const toApiFormat = (event : any) => {
 };
 
 export const toClientFormat = (event: any) => {
-  // Always transform to client-side format with camelCase
   const {
     is_online, start_time, end_time, created_by,
     ...rest
   } = event;
   
-  // Convert to explicitly boolean values
   const isOnlineBoolean = Boolean(is_online === true || 
     is_online === 'true' || 
     is_online === 1 || 

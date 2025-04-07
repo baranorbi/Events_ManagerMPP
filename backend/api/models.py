@@ -1,9 +1,6 @@
 from django.db import models
 from datetime import datetime
 
-# These are just model definitions for validation
-# The actual data will be stored in memory
-
 class Event(models.Model):
     id = models.CharField(max_length=100, primary_key=True)
     title = models.CharField(max_length=200)
@@ -18,8 +15,6 @@ class Event(models.Model):
     is_online = models.BooleanField(default=False)
 
     class Meta:
-        # This tells Django not to create a table for this model
-        # We'll use the in-memory store instead
         managed = False
 
 class User(models.Model):
@@ -29,7 +24,5 @@ class User(models.Model):
     avatar = models.URLField(null=True, blank=True)
     
     class Meta:
-        # This tells Django not to create a table for this model
-        # We'll use the in-memory store instead
         managed = False
 

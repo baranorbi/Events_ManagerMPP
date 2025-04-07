@@ -136,7 +136,6 @@ const formatTime = (date: Date) => {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-// Close the dropdown when clicking outside
 const closeOnOutsideClick = (event: MouseEvent) => {
   if (showDetails.value) {
     const target = event.target as HTMLElement;
@@ -146,10 +145,8 @@ const closeOnOutsideClick = (event: MouseEvent) => {
   }
 };
 
-// Add event listener when component is mounted
 document.addEventListener('click', closeOnOutsideClick);
 
-// Remove event listener when component is unmounted
 onUnmounted(() => {
   document.removeEventListener('click', closeOnOutsideClick);
 });

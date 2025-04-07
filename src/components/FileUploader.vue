@@ -221,7 +221,6 @@ const props = defineProps({
 
 const emit = defineEmits(['upload-complete', 'upload-error']);
 
-// Component state
 const fileInput = ref<HTMLInputElement | null>(null);
 const selectedFile = ref<File | null>(null);
 const filePreviewUrl = ref<string>('');
@@ -229,26 +228,23 @@ const isDragging = ref(false);
 const uploadedFiles = ref<UploadResult[]>([]);
 const largeFileMode = ref(props.initialLargeFileMode);
 
-// Bind to upload service state
 const isUploading = fileUploadService.isUploading;
 const uploadProgress = fileUploadService.progress;
 
-// Computed properties
 const isImage = computed(() => {
   if (!selectedFile.value) return false;
   return selectedFile.value.type.startsWith('image/');
 });
 
-// Methods
 const openFileDialog = () => {
   fileInput.value?.click();
 };
 
-const onDragOver = (event: DragEvent) => {
+const onDragOver = (_: DragEvent) => {
   isDragging.value = true;
 };
 
-const onDragLeave = (event: DragEvent) => {
+const onDragLeave = (_: DragEvent) => {
   isDragging.value = false;
 };
 
@@ -271,7 +267,6 @@ const onFileSelected = (event: Event) => {
 };
 
 const handleFileSelection = (file: File) => {
-  // Check file size if max is specified
   if (props.maxFileSize > 0 && file.size > props.maxFileSize) {
     alert(`File size exceeds the maximum allowed (${formatFileSize(props.maxFileSize)})`);
     clearSelectedFile();
@@ -280,7 +275,7 @@ const handleFileSelection = (file: File) => {
   
   selectedFile.value = file;
   
-  // Create preview URL for images
+  // preview URL for images
   if (file.type.startsWith('image/')) {
     filePreviewUrl.value = URL.createObjectURL(file);
   } else {
@@ -296,7 +291,6 @@ const clearSelectedFile = () => {
   selectedFile.value = null;
   filePreviewUrl.value = '';
   
-  // Reset file input
   if (fileInput.value) {
     fileInput.value.value = '';
   }
@@ -309,15 +303,12 @@ const uploadFile = async () => {
     let result: UploadResult;
     
     if (largeFileMode.value) {
-      // Use chunked upload for large files
       result = await fileUploadService.uploadLargeFile(selectedFile.value);
     } else {
-      // Use regular upload
       result = await fileUploadService.uploadFile(selectedFile.value);
     }
     
     if (result.success) {
-      // Add to uploaded files list
       uploadedFiles.value.push(result);
       emit('upload-complete', result);
     } else {
@@ -325,7 +316,6 @@ const uploadFile = async () => {
       alert(`Upload failed: ${result.error}`);
     }
     
-    // Clear the selected file after upload
     clearSelectedFile();
   } catch (error) {
     console.error('Error during upload:', error);
@@ -359,13 +349,11 @@ const toggleUploadMode = () => {
   largeFileMode.value = !largeFileMode.value;
 };
 
-// Clean up when component is unmounted
 onUnmounted(() => {
   if (filePreviewUrl.value) {
     URL.revokeObjectURL(filePreviewUrl.value);
   }
   
-  // Cancel any ongoing upload
   if (isUploading.value) {
     fileUploadService.cancelUpload();
   }

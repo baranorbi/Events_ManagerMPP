@@ -19,14 +19,12 @@ class EventSerializer(serializers.Serializer):
     is_online = serializers.BooleanField(default=False)
     
     def validate_date(self, value):
-        # Ensure date is not in the past
         today = datetime.now().date()
         if value < today:
             raise serializers.ValidationError("Event date cannot be in the past")
         return value
     
     def validate(self, data):
-        # Validate start_time and end_time if both are provided
         if 'start_time' in data and 'end_time' in data and data['start_time'] and data['end_time']:
             if data['start_time'] >= data['end_time']:
                 raise serializers.ValidationError({"end_time": "End time must be after start time"})

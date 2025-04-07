@@ -7,13 +7,11 @@ class WebSocketService {
   private maxReconnectAttempts: number = 5;
   private reconnectTimer: number | null = null;
   
-  // Status refs that can be used in components
   public isConnected = ref(false);
   public isGenerating = ref(false);
   public lastMessage = ref<any>(null);
   public connectionError = ref<string | null>(null);
   
-  // Event callbacks
   private eventCallbacks: { [key: string]: Array<(data: any) => void> } = {
     'event_update': [],
     'connection_established': [],
@@ -24,11 +22,9 @@ class WebSocketService {
   
   constructor(private url: string = '') {
     if (!url) {
-      // Default WebSocket URL based on current hostname
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host === 'localhost:5173' ? 'localhost:8000' : window.location.host;
       
-      // Make sure the path has both leading and trailing slashes
       this.url = `${protocol}//${host}/ws/events/`;
       
       console.log(`WebSocket connecting to: ${this.url}`); // Debug log
@@ -173,7 +169,6 @@ class WebSocketService {
   }
 }
 
-// Create a singleton instance
 const websocketService = new WebSocketService();
 
 export default websocketService;

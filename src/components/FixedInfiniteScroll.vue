@@ -49,22 +49,19 @@ onMounted(() => {
   isComponentMounted.value = true;
   console.log('FixedInfiniteScroll mounted');
   
-  // Add scroll listener for loading more items
   window.addEventListener('scroll', checkScrollPosition);
   window.addEventListener('resize', checkScrollPosition);
   
-  // Check if we're already at the bottom of a short page
   setTimeout(() => {
     checkScrollPosition();
     checkIfNearBottom();
   }, 500);
   
-  // Set up less frequent periodic checks
   const intervalId = setInterval(() => {
     if (props.hasMore && !props.loading && isComponentMounted.value) {
       checkScrollPosition();
     }
-  }, 2000); // Changed from 1000 to 2000ms
+  }, 2000);
   
   onUnmounted(() => {
     clearInterval(intervalId);
@@ -74,7 +71,6 @@ onMounted(() => {
   });
 });
 
-// Update the checkScrollPosition function to be less aggressive
 const checkScrollPosition = () => {
   if (!sentinel.value || !isComponentMounted.value || props.loading) return;
   
@@ -100,17 +96,14 @@ const getScrollProgress = () => {
   const windowHeight = window.innerHeight;
   const documentHeight = document.documentElement.scrollHeight;
   
-  // Calculate how far down the page we've scrolled (0-1)
   return scrollTop / (documentHeight - windowHeight);
 };
 
-// Add an extra scroll handler
 onMounted(() => {
   window.addEventListener('scroll', () => {
     if (props.hasMore && !props.loading) {
       checkScrollPosition();
       
-      // If we've scrolled down significantly, emit the remove-items event
       const scrollProgress = getScrollProgress();
       if (scrollProgress > 0.5 && props.maxItems !== undefined) {
         emit('remove-items', props.maxItems / 2);
@@ -124,7 +117,6 @@ const checkIfNearBottom = () => {
   const windowHeight = window.innerHeight;
   const documentHeight = document.documentElement.scrollHeight;
   
-  // Consider "near bottom" when within 200px of the page bottom
   const isNearBottom = scrollPosition + windowHeight >= documentHeight - 200;
   
   if (isNearBottom && props.hasMore && !props.loading) {
@@ -136,7 +128,6 @@ const checkIfNearBottom = () => {
 const checkSlidingWindow = () => {
   if (!props.maxItems || !contentRef.value || !isComponentMounted.value) return;
   
-  // Find all event cards
   const gridSelector = '.grid';
   const gridContainer = contentRef.value.querySelector(gridSelector);
   
@@ -147,7 +138,6 @@ const checkSlidingWindow = () => {
   
   const childCount = gridContainer.children.length;
   
-  // Only remove items if we have significantly more than the max
   if (childCount > props.maxItems * 1.5) {
     const itemsToRemove = Math.min(
       childCount - props.maxItems,
@@ -155,30 +145,24 @@ const checkSlidingWindow = () => {
     );
     
     if (itemsToRemove > 0) {
-      console.log(`Sliding window: Removing ${itemsToRemove} items from the top`);
       emit('remove-items', itemsToRemove);
     }
   }
 };
 
-// Watch for changes that require rechecking
 watch(() => props.loading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) {
-    // Loading just completed
-    console.log('Loading completed, checking for more content');
     
     nextTick(() => {
-      // Check if we need to remove items
       checkSlidingWindow();
       
-      // Check if we need to load more
       setTimeout(() => {
         checkScrollPosition();
       }, 200);
     });
   }
 });
-// Watch for hasMore changes
+
 watch(() => props.hasMore, (hasMore) => {
   if (hasMore) {
     nextTick(() => {
@@ -186,14 +170,12 @@ watch(() => props.hasMore, (hasMore) => {
     });
   }
   if (hasMore && !observer.value) {
-    console.log('hasMore is true but observer is null, reconnecting');
     nextTick(() => {
       createObserver();
     });
   }
 });
 
-// Add this to the script section
 const forceReconnectObserver = () => {
   if (observer.value) {
     observer.value.disconnect();
@@ -203,11 +185,10 @@ const forceReconnectObserver = () => {
     createObserver();
     console.log('Observer forcefully reconnected');
     
-    // Also check if we need to load more content immediately
     setTimeout(checkScrollPosition, 100);
   });
 };
-// Create IntersectionObserver
+
 const createObserver = () => {
   if (sentinel.value && isComponentMounted.value) {
     observer.value = new IntersectionObserver((entries) => {
@@ -220,7 +201,6 @@ const createObserver = () => {
   }
 };
 
-// Expose methods for parent component
 defineExpose({
   checkScrollPosition,
   checkIfNearBottom,

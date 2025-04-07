@@ -205,7 +205,6 @@ const loadUserEvents = async () => {
   try {
     const events = await eventStore.getUserEvents();
     
-    // Deduplicate events by title and category
     const uniqueEventMap = new Map();
     
     events.forEach(event => {
@@ -324,13 +323,10 @@ const eventDeleted = async (eventId: string) => {
     const result = await eventStore.deleteEvent(eventId);
     
     if (result.success) {
-      // Always reload events after successful deletion
       await loadUserEvents();
       
-      // Close the modal if it's open
       showEditEventModal.value = false;
       
-      // Show success notification
       alert('Event deleted successfully.');
     } else {
       throw new Error(result.error || 'Unknown error deleting event');
