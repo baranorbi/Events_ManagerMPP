@@ -154,27 +154,24 @@ export const chartDataGenerator = {
   },
 
   enhanceOnlineVsOfflineData(events: Event[]): [number, number] {
-    let onlineCount = 0
-    let inPersonCount = 0
-
+    let onlineCount = 0;
+    let inPersonCount = 0;
+  
     events.forEach((event) => {
-      if ("isOnline" in event && event.isOnline) {
-        onlineCount++
+
+      const isEventOnline = 
+        event.isOnline === true || 
+        String(event.isOnline).toLowerCase() === 'true' || 
+        Number(event.isOnline) === 1 || 
+        String(event.isOnline) === '1';
+      if (isEventOnline) {
+        onlineCount++;
       } else {
-        inPersonCount++
+        inPersonCount++;
       }
-    })
-
-    if (onlineCount > 0 || inPersonCount > 0) {
-      onlineCount += Math.floor(Math.random() * 2)
-      inPersonCount += Math.floor(Math.random() * 2)
-    } else {
-      const total = 10
-      onlineCount = Math.round(total * (0.6 + (Math.random() * 0.1 - 0.05)))
-      inPersonCount = total - onlineCount
-    }
-
-    return [onlineCount, inPersonCount]
-  },
+    });
+    
+    return [onlineCount, inPersonCount];
+  }
 }
 

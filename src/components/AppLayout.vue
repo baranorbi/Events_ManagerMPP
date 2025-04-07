@@ -28,6 +28,9 @@
         </div>
       </div>
       
+      <!-- Network Status Indicator -->
+      <NetworkStatusIndicator />
+      
       <!-- Shuffle Button -->
       <button 
         @click="openRandomEvent"
@@ -47,6 +50,18 @@
         {{ isAuthenticated ? 'Sign Out' : 'Sign In' }}
       </button>
     </header>
+    
+    <!-- Offline Mode Banner -->
+    <div v-if="connectionStatus !== 'online'" class="bg-[#533673] p-2 text-white text-center">
+      <div v-if="connectionStatus === 'offline'" class="flex items-center justify-center gap-2">
+        <WifiOff :size="16" />
+        <span>You are currently offline. Changes will be saved locally and synced when you reconnect.</span>
+      </div>
+      <div v-else-if="connectionStatus === 'server-down'" class="flex items-center justify-center gap-2">
+        <ServerCrash :size="16" />
+        <span>Server is currently unreachable. Changes will be saved locally and synced when the server is available.</span>
+      </div>
+    </div>
     
     <!-- Sidebar and Content Container -->
     <div class="flex flex-1">
@@ -98,6 +113,17 @@
           </div>
           <span class="text-xs mt-2 text-[#D9D9D9]">Profile</span>
         </router-link>
+        <!-- Media -->
+        <router-link 
+          to="/media" 
+          class="sidebar-item mb-8"
+          :class="{ 'active': currentRoute === '/media' }"
+        >
+          <div class="icon-container">
+            <Film :size="20" class="text-[#D9D9D9]" />
+          </div>
+          <span class="text-xs mt-2 text-[#D9D9D9]">Media</span>
+        </router-link>
       </aside>
       
       <!-- Main Content -->
@@ -116,28 +142,64 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { Layers, Search, X, Home, Zap, User, Shuffle, BarChart2 } from 'lucide-vue-next';
+import { 
+  Layers, Search, X, Home, Zap, User, Shuffle, 
+  BarChart2, WifiOff, ServerCrash, Film 
+} from 'lucide-vue-next';
 import { useEventStore } from '../store/events';
 import { useAuthStore } from '../store/auth';
+import { useOfflineStore } from '../store/offlineStore';
 import EventDetailsModal from './EventDetailsModal.vue';
+import NetworkStatusIndicator from './NetworkStatusIndicator.vue';
 
 const route = useRoute();
 const router = useRouter();
 const eventStore = useEventStore();
 const authStore = useAuthStore();
+const { connectionStatus } = useOfflineStore();
 
 const searchQuery = ref('');
 const showRandomEventModal = ref(false);
 const randomEventId = ref('');
 const isLoadingRandom = ref(false);
+const isMounted = ref(true);
 
 const isAuthenticated = computed(() => authStore.checkAuth());
 
 const currentRoute = computed(() => {
   return route.path;
 });
+
+onMounted(() => {
+  isMounted.value = true;
+  document.addEventListener('click', closeOnOutsideClick);
+});
+
+onBeforeUnmount(() => {
+  isMounted.value = false;
+  document.removeEventListener('click', closeOnOutsideClick);
+});
+
+const closeOnOutsideClick = (event: MouseEvent) => {
+  // First check if component is still mounted
+  if (!isMounted.value) {
+    return;
+  }
+  
+  const target = event.target as HTMLElement;
+  
+  // Check if target is still in document
+  if (!document.body.contains(target)) {
+    return;
+  }
+  
+  // Check for random event modal
+  if (showRandomEventModal.value && !target.closest('.modal-container')) {
+    showRandomEventModal.value = false;
+  }
+};
 
 const toggleAuth = () => {
   if (isAuthenticated.value) {

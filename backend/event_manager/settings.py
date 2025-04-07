@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'channels',
     'corsheaders',
     'api',
 ]
@@ -58,6 +59,9 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+# Important for WebSockets
+CORS_ALLOW_CREDENTIALS = True
+
 ROOT_URLCONF = 'event_manager.urls'
 
 TEMPLATES = [
@@ -78,6 +82,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'event_manager.wsgi.application'
 
+# Media files (uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Configure upload handlers to handle large files
+FILE_UPLOAD_HANDLERS = [
+    'django.core.files.uploadhandler.MemoryFileUploadHandler',
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]
+
+# Increase the maximum upload size (to 500MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # 500MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB - after this Django will use disk
+
 # Use a file-based SQLite database for development
 # This allows migrations to persist between server restarts
 # while still not requiring a full database setup
@@ -85,6 +103,14 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+# Channels settings
+ASGI_APPLICATION = 'event_manager.asgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     }
 }
 

@@ -5,7 +5,11 @@ from .views import (
     UserEventsView, 
     UserInterestedEventsView,
     UserDetailView,
-    AuthView
+    AuthView,
+    ApiRootView,
+    FileUploadView,
+    ChunkedFileUploadView,
+    FileDownloadView
 )
 
 urlpatterns = [
@@ -22,5 +26,13 @@ urlpatterns = [
     
     # Auth endpoint
     path('auth/', AuthView.as_view(), name='auth'),
+    
+    # API root endpoint
+    path('', ApiRootView.as_view(), name='api-root'),
+    
+    # File upload endpoints
+    path('upload/', FileUploadView.as_view(), name='file-upload'),
+    path('upload/chunked/', ChunkedFileUploadView.as_view(), name='chunked-upload'),
+    path('download/<str:filename>/', FileDownloadView.as_view(), name='file-download'),
 ]
 

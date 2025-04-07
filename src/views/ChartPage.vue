@@ -58,6 +58,38 @@
         >
           {{ generating ? 'Generating...' : 'Generate More Data' }}
         </button>
+        <button
+          @click="toggleEventGeneration"
+          class="px-4 py-2 rounded-md text-white transition-colors"
+          :class="isGeneratingEvents ? 'bg-red-600 hover:bg-red-700' : 'bg-[#533673] hover:bg-[#432663]'"
+        >
+          <span v-if="isGeneratingEvents">Stop Real-time Generation</span>
+          <span v-else>Start Real-time Generation</span>
+        </button>
+        
+        <!-- WebSocket connection status indicator -->
+        <div class="px-3 py-2 rounded-md text-sm flex items-center space-x-2"
+          :class="isWebSocketConnected ? 'bg-green-600 bg-opacity-20 text-green-500' : 'bg-red-600 bg-opacity-20 text-red-500'"
+        >
+          <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-green-500' : 'bg-red-500'"></div>
+          <span>{{ isWebSocketConnected ? 'Connected' : 'Disconnected' }}</span>
+        </div>
+        <div class="mt-4 flex items-center space-x-2">
+        <div class="px-3 py-2 rounded-md text-sm flex items-center space-x-2"
+          :class="isWebSocketConnected ? 'bg-green-600 bg-opacity-20 text-green-500' : 'bg-red-600 bg-opacity-20 text-red-500'"
+        >
+          <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-green-500' : 'bg-red-500'"></div>
+          <span>{{ isWebSocketConnected ? 'WebSocket: Connected' : 'WebSocket: Disconnected' }}</span>
+        </div>
+        
+        <button
+          v-if="!isWebSocketConnected"
+          @click="reconnectWebSocket"
+          class="px-3 py-2 bg-[#232323] text-[#D9D9D9] rounded-md hover:bg-[#333333] transition-colors"
+        >
+          Reconnect
+        </button>
+      </div>
       </div>
     </div>
   </AppLayout>
@@ -72,6 +104,7 @@ import AppLayout from '../components/AppLayout.vue';
 import type { Event } from '../types/event';
 import { chartDataGenerator } from '../utils/dataGenerator';
 import axios from 'axios';
+import websocketService from '../utils/websocketService';
 
 const chartContainer = ref(null);
 const categoryChartCanvas = ref<HTMLCanvasElement | null>(null);
@@ -91,6 +124,8 @@ const loading = ref(true);
 const error = ref('');
 const refreshing = ref(false);
 const generating = ref(false);
+const isGeneratingEvents = ref(false);
+const isWebSocketConnected = ref(false);
 
 const chartColors = [
   'rgba(83, 54, 115, 0.8)',  // Primary purple
@@ -116,7 +151,23 @@ const tryAgain = () => {
 onMounted(() => {
   loadDataAndInitCharts();
   
-  // every 30 seconds refresh
+  // Connect to WebSocket if not already connected
+  if (!websocketService.isConnected.value) {
+    websocketService.connect();
+  }
+  
+  // Set up reactive bindings
+  isWebSocketConnected.value = websocketService.isConnected.value;
+  isGeneratingEvents.value = websocketService.isGenerating.value;
+  
+  // Watch for changes in the websocketService state
+  websocketService.isConnected.value = isWebSocketConnected.value;
+  websocketService.isGenerating.value = isGeneratingEvents.value;
+  
+  // Listen for event updates
+  websocketService.on('event_update', handleEventUpdate);
+  
+  // Set up periodic refresh interval
   refreshInterval = window.setInterval(() => {
     refreshChartData(false);
   }, 30000);
@@ -141,9 +192,20 @@ const loadDataAndInitCharts = async () => {
   }
 };
 
+const reconnectWebSocket = () => {
+  console.log('Attempting to reconnect WebSocket...');
+  websocketService.disconnect(); // First disconnect if there's any existing connection
+  setTimeout(() => {
+    websocketService.connect(); // Then try to connect again
+  }, 500);
+};
+
 onBeforeUnmount(() => {
   destroyCharts();
   if (refreshInterval) clearInterval(refreshInterval);
+  
+  // Remove event listener
+  websocketService.off('event_update', handleEventUpdate);
 });
 
 const loadEvents = async () => {
@@ -325,26 +387,36 @@ const updateCharts = () => {
   }
   
   try {
-    const currentEvents = [...events.value];
+    // Ensure all events have correct property names before processing
+    const currentEvents = events.value.map(event => {
+      // Make sure isOnline is properly converted to boolean
+      const processedEvent = { ...event };
+      
+      // Explicitly normalize isOnline field to boolean
+      if (typeof processedEvent.isOnline !== 'boolean') {
+        const isOnlineValue = 
+          processedEvent.isOnline === true || 
+          String(processedEvent.isOnline).toLowerCase() === 'true' || 
+          Number(processedEvent.isOnline) === 1 || 
+          String(processedEvent.isOnline) === '1';
+        
+        processedEvent.isOnline = Boolean(isOnlineValue);
+      }
+      
+      return processedEvent;
+    });
     
+    // Now use the cleaned events for chart updates
     if (categoryChart) {
       updateCategoryChart(currentEvents);
-      categoryChart.update('default');
     }
     
     if (timelineChart) {
       updateTimelineChart(currentEvents);
-      timelineChart.update('default');
     }
     
     if (onlineVsOfflineChart) {
       updateOnlineVsOfflineChart(currentEvents);
-      onlineVsOfflineChart.update('default');
-    }
-    
-    if (chartContainer.value) {
-      const container = chartContainer.value as HTMLElement;
-      void container.offsetHeight; // ignore the return value
     }
   } catch (err) {
     console.error('Error updating charts:', err);
@@ -360,7 +432,7 @@ const refreshChartData = async (showLoading = true) => {
   }
   
   try {
-    await loadEvents();
+    events.value = await eventStore.getAllEvents();
     console.log('Events refreshed, count:', events.value.length);
     
     if (events.value.length === 0) {
@@ -368,33 +440,48 @@ const refreshChartData = async (showLoading = true) => {
       return;
     }
     
+    // Debug to check for duplicated events
+    const titles = events.value.map(e => e.title);
+    const titleCounts = titles.reduce<Record<string, number>>((acc, title) => {
+      acc[title] = (acc[title] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const duplicates = Object.entries(titleCounts)
+      .filter(([_, count]) => count > 1)
+      .map(([title, count]) => `${title} (${count}x)`);
+      
+    if (duplicates.length > 0) {
+      console.warn('Duplicate events found:', duplicates.join(', '));
+    }
+    // Check for online events
+    const onlineEvents = events.value.filter(e => e.isOnline === true);
+    const onlineLocations = onlineEvents.map(e => e.location);
+    console.log(`Found ${onlineEvents.length} online events out of ${events.value.length} total`);
+    console.log('Online event locations:', [...new Set(onlineLocations)]);
+    console.log('Online event sample:', onlineEvents.slice(0, 3));
+
+    // Verify data quality
+    const inconsistentEvents = events.value.filter(e => 
+      (e.isOnline === true && e.location !== 'Remote') || 
+      (e.isOnline === false && e.location === 'Remote')
+    );
+    if (inconsistentEvents.length > 0) {
+      console.warn(`Found ${inconsistentEvents.length} events with inconsistent online/location values`);
+      console.log('First few inconsistent events:', inconsistentEvents.slice(0, 3));
+    }
+
+    // Continue with chart updates
     if (categoryChart && timelineChart && onlineVsOfflineChart) {
-      console.log('Updating existing charts with new data');
-      updateCategoryChart(events.value);
-      updateTimelineChart(events.value);
-      updateOnlineVsOfflineChart(events.value);
+      console.log('Updating charts with new data...');
       
-      // Force update all charts
-      categoryChart.update('default');
-      timelineChart.update('default');
-      onlineVsOfflineChart.update('default');
-    } else {
-      console.log('Charts need initialization, reinitializing...');
+      // Do a complete refresh
       destroyCharts();
-      
-      await new Promise(resolve => setTimeout(resolve, 500));
       await nextTick();
-      
-      if (!categoryChartCanvas.value || !timelineChartCanvas.value || !onlineVsOfflineChartCanvas.value) {
-        console.error('Canvas elements not found, re-initializing component...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await nextTick();
-        
-        initCharts();
-      } else {
-        console.log('Canvas elements found, creating charts...');
-        createCharts();
-      }
+      initCharts();
+    } else {
+      console.log('Charts need initialization');
+      initCharts();
     }
   } catch (err) {
     console.error('Failed to refresh chart data:', err);
@@ -443,15 +530,13 @@ const updateOnlineVsOfflineChart = (events: Event[]) => {
     console.error('Online/Offline chart not initialized');
     return;
   }
-  
-  console.log('Events for online/offline chart:', events.map(e => ({ id: e.id, title: e.title, isOnline: e.isOnline })));
+
   const [onlineCount, inPersonCount] = chartDataGenerator.enhanceOnlineVsOfflineData(events);
-  console.log('Online count:', onlineCount, 'In-person count:', inPersonCount);
+  console.log('Chart counts - Online:', onlineCount, 'In-person:', inPersonCount);
   
   onlineVsOfflineChart.data.datasets[0].data = [onlineCount, inPersonCount];
   onlineVsOfflineChart.update();
-  console.log('Online/Offline chart updated');
-};
+}
 
 const generateMoreData = async () => {
   generating.value = true;
@@ -459,7 +544,7 @@ const generateMoreData = async () => {
   
   try {
     const baseEvents = await eventStore.getAllEvents();
-    const enhancedEvents = chartDataGenerator.enhanceEvents(baseEvents, 5);
+    const enhancedEvents = chartDataGenerator.enhanceEvents(baseEvents, 50);
     
     const userId = authStore.getUser()?.id || 'user1';
     let successCount = 0;
@@ -477,7 +562,11 @@ const generateMoreData = async () => {
             category: newEvent.category || 'Conference',
             location: newEvent.location || 'Remote',
             is_online: newEvent.isOnline || false,
-            date: typeof newEvent.date === 'string' ? newEvent.date : new Date().toISOString().split('T')[0],
+            // Properly format the date from the generated event
+            date: newEvent.date instanceof Date ? 
+                  newEvent.date.toISOString().split('T')[0] : 
+                  (typeof newEvent.date === 'string' ? 
+                   newEvent.date : new Date().toISOString().split('T')[0]),
             created_by: userId
           };
           
@@ -494,10 +583,11 @@ const generateMoreData = async () => {
         }
       }
     }
+
+    await eventStore.refreshEvents();
     
     if (successCount > 0) {
       await refreshChartData(false);
-      alert(`Successfully created ${successCount} events!${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
     } else {
       throw new Error('No events were created successfully');
     }
@@ -507,6 +597,23 @@ const generateMoreData = async () => {
     error.value = 'Failed to generate demo data. Please try again.';
   } finally {
     generating.value = false;
+  }
+};
+
+// Handle real-time event updates
+const handleEventUpdate = (data: any) => {
+  if (data.action === 'created') {
+    // A new event was created, refresh the charts
+    refreshChartData(false);
+  }
+};
+
+// Add toggleEventGeneration function
+const toggleEventGeneration = () => {
+  if (isGeneratingEvents.value) {
+    websocketService.stopEventGeneration();
+  } else {
+    websocketService.startEventGeneration();
   }
 };
 </script>

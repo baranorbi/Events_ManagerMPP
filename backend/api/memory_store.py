@@ -134,7 +134,8 @@ class MemoryStore:
         return self.events.get(event_id)
     
     def create_event(self, event_data: Dict) -> Dict:
-        event_id = str(int(datetime.now().timestamp()))
+        # Include milliseconds to reduce chance of ID collision
+        event_id = str(int(datetime.now().timestamp() * 1000))
         event_data['id'] = event_id
         
         # Convert date string to proper format if needed
@@ -147,7 +148,7 @@ class MemoryStore:
         if 'created_by' in event_data:
             user_id = event_data['created_by']
             if user_id not in self.user_events:
-                self.user_events[user_id] = []  # Initialize empty list for new users
+                self.user_events[user_id] = []
             
             self.user_events[user_id].append(event_id)
         
@@ -329,6 +330,37 @@ class MemoryStore:
             del user_copy['password']
         
         return user_copy
+    
+    def get_paginated_events(self, page=1, page_size=10, filters=None):
+        # First apply filters if any
+        if filters:
+            events = self.filter_events(filters)
+        else:
+            events = list(self.events.values())
+        
+        # Calculate pagination
+        total_events = len(events)
+        total_pages = (total_events + page_size - 1) // page_size
+        
+        # Ensure page is within valid range
+        page = max(1, min(page, total_pages if total_pages > 0 else 1))
+        
+        # Get the slice for the requested page
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        
+        # Debug output
+        print(f"Pagination: page={page}, page_size={page_size}, total_events={total_events}, start_idx={start_idx}, end_idx={end_idx}")
+        
+        return {
+            'events': events[start_idx:end_idx],
+            'total_events': total_events,
+            'total_pages': total_pages,
+            'current_page': page,  # Make sure this is the requested page, not hardcoded to 1
+            'page_size': page_size,
+            'has_next': page < total_pages,
+            'has_previous': page > 1
+        }
 
 # Create a singleton instance
 memory_store = MemoryStore()
