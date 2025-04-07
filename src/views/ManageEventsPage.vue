@@ -62,7 +62,7 @@
       </div>
       
       <!-- Highlighted Events Grid with pagination -->
-      <div v-if="paginatedEvents.length > 0">
+      <div v-if="!loading && paginatedEvents.length > 0">
         <div class="text-xs text-gray-400 mb-2">
           Showing {{ filteredEvents.length }} of {{ userEvents.length }} events
         </div>
@@ -203,7 +203,20 @@ const loadUserEvents = async () => {
   error.value = '';
   
   try {
-    userEvents.value = await eventStore.getUserEvents();
+    const events = await eventStore.getUserEvents();
+    
+    // Deduplicate events by title and category
+    const uniqueEventMap = new Map();
+    
+    events.forEach(event => {
+      const key = `${event.title}-${event.category}`;
+      if (!uniqueEventMap.has(key) || 
+          parseInt(event.id) > parseInt(uniqueEventMap.get(key).id)) {
+        uniqueEventMap.set(key, event);
+      }
+    });
+    
+    userEvents.value = Array.from(uniqueEventMap.values());
   } catch (err) {
     console.error('Failed to load user events:', err);
     error.value = 'Failed to load your events. Please try again.';

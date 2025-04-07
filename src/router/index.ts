@@ -5,6 +5,7 @@ import ProfilePage from '../views/ProfilePage.vue';
 import ManageEventsPage from '../views/ManageEventsPage.vue';
 import SignInPage from '../views/SignInPage.vue';
 import ChartPage from '../views/ChartPage.vue';
+import MediaPage from '../views/MediaPage.vue';
 import { useAuthStore } from '../store/auth';
 
 const routes = [
@@ -39,6 +40,14 @@ const routes = [
     path: '/sign-in',
     name: 'SignIn',
     component: SignInPage
+  },
+  {
+    path: '/media',
+    name: 'Media',
+    component: MediaPage,
+    meta: {
+      requiresAuth: false
+    }
   }
 ];
 
