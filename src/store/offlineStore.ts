@@ -109,17 +109,36 @@ export function useOfflineStore() {
   const applyOperationLocally = (operation: PendingOperation) => {
     const { type, resource, resourceId, data } = operation;
     
+    // Initialize collections if they don't exist
+    if (!offlineData.value.events) offlineData.value.events = [];
+    if (!offlineData.value.userEvents) offlineData.value.userEvents = [];
+    if (!offlineData.value.interestedEvents) offlineData.value.interestedEvents = [];
+    if (!offlineData.value.interested) offlineData.value.interested = [];
+    if (!offlineData.value.users) offlineData.value.users = {};
+    
+    // Handle event operations
     if (resource === 'event') {
       if (type === 'create') {
+        // Generate a temporary ID if not provided
         const tempId = data.id || `temp-${uuidv4()}`;
+        
+        // Create a new event with offline flag
         const event = {
           ...data,
           id: tempId,
           _offlineCreated: true
         };
+        
+        // Add to main events collection
         offlineData.value.events.push(event);
+        
+        // If this event is created by a user, also add to userEvents
+        if (data.created_by) {
+          offlineData.value.userEvents.push(event);
+        }
       } 
       else if (type === 'update' && resourceId) {
+        // Update event in main events collection
         const index = offlineData.value.events.findIndex((e: any) => e.id === resourceId);
         if (index !== -1) {
           offlineData.value.events[index] = {
@@ -128,22 +147,63 @@ export function useOfflineStore() {
             _offlineUpdated: true
           };
         }
+        
+        // Also update in userEvents if present
+        const userEventsIndex = offlineData.value.userEvents.findIndex(
+          (e: any) => e.id === resourceId
+        );
+        if (userEventsIndex !== -1) {
+          offlineData.value.userEvents[userEventsIndex] = {
+            ...offlineData.value.userEvents[userEventsIndex],
+            ...data,
+            _offlineUpdated: true
+          };
+        }
+        
+        // Also update in interestedEvents if present
+        const interestedEventsIndex = offlineData.value.interestedEvents.findIndex(
+          (e: any) => e.id === resourceId
+        );
+        if (interestedEventsIndex !== -1) {
+          offlineData.value.interestedEvents[interestedEventsIndex] = {
+            ...offlineData.value.interestedEvents[interestedEventsIndex],
+            ...data,
+            _offlineUpdated: true
+          };
+        }
       } 
       else if (type === 'delete' && resourceId) {
+        // Remove from main events collection
         offlineData.value.events = offlineData.value.events.filter(
           (e: any) => e.id !== resourceId
         );
+        
+        // Remove from userEvents if present
+        offlineData.value.userEvents = offlineData.value.userEvents.filter(
+          (e: any) => e.id !== resourceId
+        );
+        
+        // Remove from interestedEvents if present
+        offlineData.value.interestedEvents = offlineData.value.interestedEvents.filter(
+          (e: any) => e.id !== resourceId
+        );
+        
+        // Remove from interested relationships
+        offlineData.value.interested = offlineData.value.interested.filter(
+          (i: any) => i.eventId !== resourceId
+        );
       }
     }
+    // Handle user operations
     else if (resource === 'user') {
       if (type === 'create') {
         const tempId = data.id || `temp-${uuidv4()}`;
-        const user = {
+        
+        offlineData.value.users[tempId] = {
           ...data,
           id: tempId,
           _offlineCreated: true
         };
-        offlineData.value.users[tempId] = user;
       } 
       else if (type === 'update' && resourceId) {
         if (offlineData.value.users[resourceId]) {
@@ -156,24 +216,52 @@ export function useOfflineStore() {
       } 
       else if (type === 'delete' && resourceId) {
         delete offlineData.value.users[resourceId];
+        
+        // Also clean up related user events and interested events
+        offlineData.value.userEvents = offlineData.value.userEvents.filter(
+          (e: any) => e.created_by !== resourceId
+        );
+        
+        offlineData.value.interested = offlineData.value.interested.filter(
+          (i: any) => i.userId !== resourceId
+        );
       }
     }
+    // Handle interested event operations
     else if (resource === 'interested') {
-      if (!offlineData.value.interested) {
-        offlineData.value.interested = [];
-      }
-      
       if (type === 'create' && data) {
+        // Add to interested relationships
         offlineData.value.interested.push({
           userId: data.userId,
           eventId: data.eventId,
           _offlineCreated: true
         });
+        
+        // Find the event and add to interestedEvents collection if not already there
+        const event = offlineData.value.events.find((e: any) => e.id === data.eventId);
+        if (event && !offlineData.value.interestedEvents.some((e: any) => e.id === data.eventId)) {
+          offlineData.value.interestedEvents.push({
+            ...event,
+            _offlineInterested: true
+          });
+        }
       } 
       else if (type === 'delete' && data) {
+        // Remove from interested relationships
         offlineData.value.interested = offlineData.value.interested.filter(
           (i: any) => !(i.userId === data.userId && i.eventId === data.eventId)
         );
+        
+        // Remove from interestedEvents if this was the only interested relationship for this event
+        const remainingInterested = offlineData.value.interested.some(
+          (i: any) => i.eventId === data.eventId
+        );
+        
+        if (!remainingInterested) {
+          offlineData.value.interestedEvents = offlineData.value.interestedEvents.filter(
+            (e: any) => e.id !== data.eventId
+          );
+        }
       }
     }
   };
@@ -242,28 +330,55 @@ export function useOfflineStore() {
     try {
       if (resource === 'event') {
         if (type === 'create') {
+          // Handle create operation
           const response = await api.post('/events/', data);
-          return response.status >= 200 && response.status < 300;
-        } 
+          
+          // If successful, update any local references to this event
+          if (response.data && response.data.id) {
+            updateLocalReferences(operation.id, response.data.id);
+          }
+          
+          return true;
+        }
         else if (type === 'update' && resourceId) {
-          const response = await api.patch(`/events/${resourceId}/`, data);
-          return response.status >= 200 && response.status < 300;
-        } 
+          // Handle update operation
+          await api.patch(`/events/${resourceId}/`, data);
+          return true;
+        }
         else if (type === 'delete' && resourceId) {
-          const response = await api.delete(`/events/${resourceId}/`);
-          return response.status >= 200 && response.status < 300;
+          try {
+            // Handle delete operation
+            await api.delete(`/events/${resourceId}/`);
+            return true;
+          } catch (error : any) {
+            // If the server returns 404, consider the delete operation as successful
+            // because the resource doesn't exist on the server anyway
+            if (error.response && error.response.status === 404) {
+              console.log(`Event ${resourceId} already deleted on server or doesn't exist. Marking delete operation as synced.`);
+              return true;
+            }
+            throw error; // Re-throw for other types of errors
+          }
         }
       }
       else if (resource === 'interested') {
+        // Handle interested operations (similar pattern as above)
         if (type === 'create' && data) {
-          const response = await api.post(`/users/${data.userId}/interested/`, { 
-            event_id: data.eventId 
-          });
-          return response.status >= 200 && response.status < 300;
-        } 
+          await api.post(`/users/${data.userId}/interested/`, { event_id: data.eventId });
+          return true;
+        }
         else if (type === 'delete' && data) {
-          const response = await api.delete(`/users/${data.userId}/interested/${data.eventId}/`);
-          return response.status >= 200 && response.status < 300;
+          try {
+            await api.delete(`/users/${data.userId}/interested/${data.eventId}/`);
+            return true;
+          } catch (error : any) {
+            // If the server returns 404, consider the delete operation as successful
+            if (error.response && error.response.status === 404) {
+              console.log(`Interest relationship already deleted on server or doesn't exist. Marking delete operation as synced.`);
+              return true;
+            }
+            throw error;
+          }
         }
       }
       
@@ -271,6 +386,41 @@ export function useOfflineStore() {
     } catch (error) {
       console.error('Error during sync operation:', error);
       return false;
+    }
+  };
+  
+  // Helper function to update local references when an offline created item gets synced
+  const updateLocalReferences = (tempId: string, serverId: string) => {
+    if (!tempId.startsWith('temp-')) return;
+    
+    // Update event IDs in the events collection
+    if (offlineData.value.events) {
+      offlineData.value.events = offlineData.value.events.map((event: any) => {
+        if (event.id === tempId) {
+          return { ...event, id: serverId, _offlineCreated: false };
+        }
+        return event;
+      });
+    }
+    
+    // Update event IDs in the userEvents collection
+    if (offlineData.value.userEvents) {
+      offlineData.value.userEvents = offlineData.value.userEvents.map((event: any) => {
+        if (event.id === tempId) {
+          return { ...event, id: serverId, _offlineCreated: false };
+        }
+        return event;
+      });
+    }
+    
+    // Update event IDs in interested relationships
+    if (offlineData.value.interested) {
+      offlineData.value.interested = offlineData.value.interested.map((interest: any) => {
+        if (interest.eventId === tempId) {
+          return { ...interest, eventId: serverId };
+        }
+        return interest;
+      });
     }
   };
   

@@ -102,16 +102,25 @@ export function useEventStore() {
     try {
       // Check if offline or server is down
       if (offlineStore.connectionStatus.value !== 'online') {
-        console.log('Using offline data for user events');
-        userEvents.value = offlineStore.offlineData.value.events
-          .filter((e: any) => e.created_by === userId)
-          .map((event : any) => toClientFormat(event));
+        console.log('Loading user events from offline cache');
+        // Get user events from offline cache
+        const offlineData = offlineStore.offlineData.value;
+        if (offlineData.userEvents) {
+          userEvents.value = offlineData.userEvents.map(toClientFormat);
+        } else if (offlineData.events) {
+          // Filter events created by this user
+          userEvents.value = offlineData.events
+            .filter((e: any) => e.created_by === userId)
+            .map(toClientFormat);
+        }
         return;
       }
       
       const response = await api.get(`/users/${userId}/events/`);
-      userEvents.value = response.data.map(toClientFormat);
-      
+      userEvents.value = Array.isArray(response.data) 
+        ? response.data.map(toClientFormat) 
+        : [];
+        
       // Cache for offline use
       const userEventsCache = response.data;
       offlineStore.offlineData.value.userEvents = userEventsCache;
@@ -120,11 +129,11 @@ export function useEventStore() {
       
       const offlineData = offlineStore.offlineData.value;
       if (offlineData.userEvents) {
-        userEvents.value = offlineData.userEvents.map((event : any) => toClientFormat(event));
-      } else {
-        userEvents.value = offlineStore.offlineData.value.events
+        userEvents.value = offlineData.userEvents.map(toClientFormat);
+      } else if (offlineData.events) {
+        userEvents.value = offlineData.events
           .filter((e: any) => e.created_by === userId)
-          .map((event : any) => toClientFormat(event));
+          .map(toClientFormat);
       }
     }
   };
@@ -296,120 +305,136 @@ export function useEventStore() {
 
   const createEvent = async (eventData: any): Promise<string> => {
     try {
+      // Add user ID if authenticated
+      if (authStore.checkAuth()) {
+        const userId = authStore.getUser()?.id;
+        if (userId) {
+          eventData.created_by = userId;
+        }
+      }
+      
+      // Format data for API
+      const apiEventData = toApiFormat(eventData);
+      
+      // Check if offline
       if (offlineStore.connectionStatus.value !== 'online') {
-        console.log('Creating event offline');
-        const operationId = offlineStore.queueOperation('create', 'event', toApiFormat(eventData));
+        // Create temporary ID for the event
+        const tempId = 'temp-' + Date.now().toString();
         
-        return `temp-${operationId}`;
+        // Queue operation for later sync
+        offlineStore.queueOperation('create', 'event', apiEventData);
+        
+        // Create event in local cache with temp ID
+        const clientEventData = toClientFormat({
+          ...apiEventData,
+          id: tempId,
+          _offlineCreated: true
+        });
+        
+        // Add to local store immediately for UI update
+        eventsData.value.push(clientEventData);
+        
+        // If this is a user event, add to user events too
+        if (apiEventData.created_by) {
+          userEvents.value.push(clientEventData);
+        }
+        
+        return tempId;
       }
       
-      const response = await api.post('/events/', toApiFormat(eventData));
-      
+      // Online path - normal API call
+      const response = await api.post('/events/', apiEventData);
       const newEvent = response.data;
-      eventsData.value.push(toClientFormat(newEvent));
       
-      if (authStore.checkAuth() && newEvent.created_by === authStore.getUser()?.id) {
-        userEvents.value.push(toClientFormat(newEvent));
+      // Convert API response to client format
+      const clientEvent = toClientFormat(newEvent);
+      
+      // Update local data
+      eventsData.value.push(clientEvent);
+      
+      if (apiEventData.created_by) {
+        userEvents.value.push(clientEvent);
       }
-      
-      offlineStore.offlineData.value.events.push(newEvent);
       
       return newEvent.id;
     } catch (error) {
-      console.error('Error creating event:', error);
-      
-      const operationId = offlineStore.queueOperation('create', 'event', toApiFormat(eventData));
-      return `temp-${operationId}`;
+      console.error('Failed to create event:', error);
+      throw error;
     }
   };
-
+  
   const updateEvent = async (event: Event): Promise<{ success: boolean; error?: string }> => {
     try {
+      // Format for API
       const apiEventData = toApiFormat(event);
       
+      // Check if offline
       if (offlineStore.connectionStatus.value !== 'online') {
-        console.log('Updating event offline');
+        // Queue operation for later sync
         offlineStore.queueOperation('update', 'event', apiEventData, event.id);
+        
+        // Update local cache immediately
+        const index = eventsData.value.findIndex(e => e.id === event.id);
+        if (index !== -1) {
+          eventsData.value[index] = { ...eventsData.value[index], ...toClientFormat(apiEventData), _offlineUpdated: true };
+        }
+        
+        // Update in user events if present
+        const userIndex = userEvents.value.findIndex(e => e.id === event.id);
+        if (userIndex !== -1) {
+          userEvents.value[userIndex] = { ...userEvents.value[userIndex], ...toClientFormat(apiEventData), _offlineUpdated: true };
+        }
+        
         return { success: true };
       }
       
-      await api.patch(`/events/${event.id}/`, apiEventData);
+      // Online path
+      const response = await api.patch(`/events/${event.id}/`, apiEventData);
+      const updatedEvent = response.data;
       
+      // Update local data
       const index = eventsData.value.findIndex(e => e.id === event.id);
       if (index !== -1) {
-        eventsData.value[index] = { ...eventsData.value[index], ...event };
+        eventsData.value[index] = toClientFormat(updatedEvent);
       }
       
-      const userEventIndex = userEvents.value.findIndex(e => e.id === event.id);
-      if (userEventIndex !== -1) {
-        userEvents.value[userEventIndex] = { ...userEvents.value[userEventIndex], ...event };
-      }
-      
-      const interestedIndex = interestedEvents.value.findIndex(e => e.id === event.id);
-      if (interestedIndex !== -1) {
-        interestedEvents.value[interestedIndex] = { ...interestedEvents.value[interestedIndex], ...event };
-      }
-      
-      const offlineIndex = offlineStore.offlineData.value.events.findIndex((e: any) => e.id === event.id);
-      if (offlineIndex !== -1) {
-        offlineStore.offlineData.value.events[offlineIndex] = {
-          ...offlineStore.offlineData.value.events[offlineIndex],
-          ...apiEventData
-        };
+      const userIndex = userEvents.value.findIndex(e => e.id === event.id);
+      if (userIndex !== -1) {
+        userEvents.value[userIndex] = toClientFormat(updatedEvent);
       }
       
       return { success: true };
     } catch (error) {
-      console.error('Error updating event:', error);
-      
-      offlineStore.queueOperation('update', 'event', toApiFormat(event), event.id);
-      
-      return { 
-        success: true, 
-        error: 'Changes saved locally and will sync when online'
-      };
+      console.error('Failed to update event:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to update event' };
     }
   };
-
+  
   const deleteEvent = async (id: string): Promise<{ success: boolean; error?: string }> => {
     try {
+      // Check if offline
       if (offlineStore.connectionStatus.value !== 'online') {
-        console.log('Deleting event offline');
+        // Queue operation for later sync
         offlineStore.queueOperation('delete', 'event', null, id);
         
+        // Remove from local cache immediately
         eventsData.value = eventsData.value.filter(e => e.id !== id);
         userEvents.value = userEvents.value.filter(e => e.id !== id);
-        interestedEvents.value = interestedEvents.value.filter(e => e.id !== id);
         
         return { success: true };
       }
       
+      // Online path
       await api.delete(`/events/${id}/`);
       
+      // Update local data
       eventsData.value = eventsData.value.filter(e => e.id !== id);
       userEvents.value = userEvents.value.filter(e => e.id !== id);
-      interestedEvents.value = interestedEvents.value.filter(e => e.id !== id);
-      
-      offlineStore.offlineData.value.events = offlineStore.offlineData.value.events.filter((e: any) => e.id !== id);
-      
-      offlineStore.offlineData.value.interested = offlineStore.offlineData.value.interested.filter(
-        (i: any) => i.eventId !== id
-      );
       
       return { success: true };
     } catch (error) {
-      console.error('Error deleting event:', error);
-      
-      offlineStore.queueOperation('delete', 'event', null, id);
-      
-      eventsData.value = eventsData.value.filter(e => e.id !== id);
-      userEvents.value = userEvents.value.filter(e => e.id !== id);
-      interestedEvents.value = interestedEvents.value.filter(e => e.id !== id);
-      
-      return { 
-        success: true, 
-        error: 'Event deleted locally and will sync when online'
-      };
+      console.error('Failed to delete event:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to delete event' };
     }
   };
 

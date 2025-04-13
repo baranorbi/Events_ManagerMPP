@@ -11,7 +11,6 @@
       <ServerCrash v-else-if="connectionStatus === 'server-down'" :size="18" />
       <Wifi v-else :size="18" />
     </button>
-    
     <!-- Dropdown with details -->
     <div 
       v-if="showDetails" 
@@ -47,7 +46,12 @@
               Server: {{ isServerReachable ? 'Online' : 'Unreachable' }}
             </span>
           </div>
-          
+          <button 
+            @click="clearPendingOperations"
+            class="mt-2 w-full py-2 text-sm bg-red-500 bg-opacity-20 rounded-md text-red-400 hover:bg-opacity-30 transition-colors"
+          >
+            Clear Pending Operations
+          </button>
           <!-- Pending operations info -->
           <div v-if="pendingCount > 0" class="mt-3 text-[#D9D9D9]">
             <div class="flex items-center">
@@ -123,6 +127,12 @@ const statusTooltip = computed(() => {
         : 'All systems operational';
   }
 });
+
+const clearPendingOperations = () => {
+  localStorage.removeItem('events_manager_pending_ops');
+  pendingOperations.value = [];
+  alert('Pending operations cleared successfully');
+};
 
 const toggleDetails = () => {
   showDetails.value = !showDetails.value;
