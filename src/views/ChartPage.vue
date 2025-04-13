@@ -75,13 +75,6 @@
           <span>{{ isWebSocketConnected ? 'Connected' : 'Disconnected' }}</span>
         </div>
         <div class="mt-4 flex items-center space-x-2">
-        <div class="px-3 py-2 rounded-md text-sm flex items-center space-x-2"
-          :class="isWebSocketConnected ? 'bg-green-600 bg-opacity-20 text-green-500' : 'bg-red-600 bg-opacity-20 text-red-500'"
-        >
-          <div class="w-2 h-2 rounded-full" :class="isWebSocketConnected ? 'bg-green-500' : 'bg-red-500'"></div>
-          <span>{{ isWebSocketConnected ? 'WebSocket: Connected' : 'WebSocket: Disconnected' }}</span>
-        </div>
-        
         <button
           v-if="!isWebSocketConnected"
           @click="reconnectWebSocket"
