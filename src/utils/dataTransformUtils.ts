@@ -24,7 +24,8 @@ export const toClientFormat = (event: any) => {
   const isOnlineBoolean = Boolean(is_online === true || 
     is_online === 'true' || 
     is_online === 1 || 
-    is_online === '1');
+    is_online === '1') ||
+    (rest.location && ['Online', 'Remote', 'Virtual'].includes(rest.location));
   
   return {
     ...rest,

@@ -487,7 +487,6 @@ const loadMoreItems = async () => {
     const response = await eventStore.getEventsPaginated(nextPage, pageSize, options);
     
     if (response && response.events && response.events.length > 0) {
-      const beforeHeight = document.documentElement.scrollHeight;
       lastScrollY.value = window.scrollY;
       
       displayedEvents.value = [...displayedEvents.value, ...response.events];
@@ -521,7 +520,6 @@ const checkIfShouldRemoveTop = () => {
   const scrollYBeforeRemoval = window.scrollY;
   
   const itemsToRemove = pageSize;
-  const oldEvents = [...displayedEvents.value];
   displayedEvents.value = displayedEvents.value.slice(itemsToRemove);
   
   nextTick(() => {
