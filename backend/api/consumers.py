@@ -1,7 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .memory_store import memory_store
+from .database_service import database_service
 from .serializers import EventSerializer
 import asyncio
 import random
@@ -30,7 +30,7 @@ class EventsConsumer(AsyncWebsocketConsumer):
         
         if action == 'start_generation':
             # start the background event generation
-            if not hasattr(memory_store, 'generation_running') or not memory_store.generation_running:
+            if not hasattr(database_service, 'generation_running') or not database_service.generation_running:
                 self.start_event_generation_thread()
                 await self.send(text_data=json.dumps({
                     'type': 'generation_status',
@@ -44,8 +44,8 @@ class EventsConsumer(AsyncWebsocketConsumer):
         
         elif action == 'stop_generation':
             # stop the background event generation
-            if hasattr(memory_store, 'generation_running') and memory_store.generation_running:
-                memory_store.generation_running = False
+            if hasattr(database_service, 'generation_running') and database_service.generation_running:
+                database_service.generation_running = False
                 await self.send(text_data=json.dumps({
                     'type': 'generation_status',
                     'status': 'stopped'
@@ -57,12 +57,41 @@ class EventsConsumer(AsyncWebsocketConsumer):
                 }))
                 
     async def event_update(self, event):
+        # Convert event to client format before sending
+        client_formatted_event = self.to_client_format(event['event'])
+        
         # send update to the WebSocket
         await self.send(text_data=json.dumps({
             'type': 'event_update',
-            'event': event['event'],
+            'event': client_formatted_event,
             'action': event['action']
         }))
+    
+    def to_client_format(self, event_data):
+        """
+        Transform server format (snake_case) to client format (camelCase)
+        for consistent event data across WebSockets
+        """
+        # Extract fields that need to be renamed
+        is_online = event_data.pop('is_online', None)
+        start_time = event_data.pop('start_time', None)
+        end_time = event_data.pop('end_time', None)
+        created_by = event_data.pop('created_by', None)
+        
+        # Create a new dictionary with the remaining fields
+        client_data = {**event_data}
+        
+        # Add transformed fields
+        if is_online is not None:
+            client_data['isOnline'] = is_online
+        if start_time is not None:
+            client_data['startTime'] = start_time
+        if end_time is not None:
+            client_data['endTime'] = end_time
+        if created_by is not None:
+            client_data['createdBy'] = created_by
+            
+        return client_data
         
     def start_event_generation_thread(self):
         # thread to generate events periodically
@@ -72,7 +101,7 @@ class EventsConsumer(AsyncWebsocketConsumer):
         
     def generate_events_background(self):
         # indicate generation is running
-        memory_store.generation_running = True
+        database_service.generation_running = True
         
         categories = ['Technology', 'Music', 'Design', 'Business', 'Food', 'Art', 'Personal', 'Work']
         
@@ -87,7 +116,7 @@ class EventsConsumer(AsyncWebsocketConsumer):
             'Work': 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc'
         }
         
-        while getattr(memory_store, 'generation_running', False):
+        while getattr(database_service, 'generation_running', False):
             try:
                 event_id = str(int(datetime.now().timestamp() * 1000))
                 category = random.choice(categories)
@@ -110,13 +139,36 @@ class EventsConsumer(AsyncWebsocketConsumer):
                     'image': category_images[category]
                 }
                 
-                memory_store.create_event(event_data)
+                # Use database_service to create event instead of memory_store
+                database_service.create_event(event_data)
                 
+                # Create both API format and client format
                 serializer = EventSerializer(event_data)
+                serialized_data = serializer.data
+                
+                # Transform to client format for WebSocket
+                client_formatted_data = {
+                    **serialized_data,
+                    'isOnline': serialized_data.get('is_online'),
+                    'startTime': serialized_data.get('start_time'),
+                    'endTime': serialized_data.get('end_time'),
+                    'createdBy': serialized_data.get('created_by'),
+                }
+                
+                # Remove the snake_case fields to avoid duplication
+                if 'is_online' in client_formatted_data:
+                    del client_formatted_data['is_online']
+                if 'start_time' in client_formatted_data:
+                    del client_formatted_data['start_time']
+                if 'end_time' in client_formatted_data:
+                    del client_formatted_data['end_time']
+                if 'created_by' in client_formatted_data:
+                    del client_formatted_data['created_by']
                 
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
-                loop.run_until_complete(self.send_event_update(serializer.data, 'created'))
+                # Send the client-formatted event
+                loop.run_until_complete(self.send_event_update(client_formatted_data, 'created'))
                 loop.close()
                 
                 time.sleep(random.randint(3, 10))
