@@ -102,8 +102,12 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB - after this Django will use disk
 # while still not requiring a full database setup
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'events_manager_db',
+        'USER': 'postgres',
+        'PASSWORD': 'asd',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
