@@ -43,9 +43,6 @@
           >
             <X :size="16" />
           </button>
-          <button @click="debugShowEvents" class="px-3 py-1 bg-gray-600 text-xs rounded">
-            Debug: Check Store
-          </button>
         </div>
         
         <!-- Legend for highlights -->

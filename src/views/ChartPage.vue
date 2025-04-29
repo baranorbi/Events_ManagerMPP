@@ -472,69 +472,63 @@ const loadData = async () => {
   };
   
   const generateBatchEvents = async () => {
-    isGeneratingBatch.value = true;
-    try {      
-      // Create 10 events
-      for (let i = 0; i < 10; i++) {
-        // Get a random category
-        const categoryIndex = Math.floor(Math.random() * categories.value.length);
-        const randomCategory = categories.value[categoryIndex];
-        const isOnline = Math.random() > 0.5;
-        
-        // Create a random date between tomorrow and 6 months from now
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        
-        const sixMonthsFromNow = new Date(today);
-        sixMonthsFromNow.setMonth(today.getMonth() + 6);
-        
-        const randomTimestamp = tomorrow.getTime() + Math.random() * (sixMonthsFromNow.getTime() - tomorrow.getTime());
-        const eventDate = new Date(randomTimestamp);
-        
-        // Create a random time
-        const hours = Math.floor(Math.random() * 24);
-        const minutes = Math.floor(Math.random() * 60);
-        const startTime = new Date();
-        startTime.setHours(hours, minutes, 0, 0);
-        
-        // Create the event with proper date formatting for API
-        const eventData = {
-          title: `Generated ${randomCategory} Event ${i+1}`,
-          description: `This is an automatically generated ${randomCategory} event for testing.`,
-          date: formatDateForAPI(eventDate), // Format as YYYY-MM-DD
-          start_time: formatTimeForAPI(startTime), // Format as HH:MM:SS
-          location: isOnline ? 'Online' : ['New York', 'Chicago', 'Los Angeles', 'Austin', 'Seattle'][Math.floor(Math.random() * 5)],
-          category: randomCategory,
-          is_online: isOnline, // Use is_online instead of isOnline
-          image: `https://source.unsplash.com/random/800x600/?${randomCategory.toLowerCase().replace(/\s+/g, ',')}`
-        };
-        
-        try {
-            // Use the API format transformer
-            const formattedData = toApiFormat(eventData);
-            
-            // Create and then reload/transform like this:
-            await eventStore.createEvent(formattedData);
-            
-            // Manually update the event array to add the isOnline property
-            events.value.push({
-                ...formattedData,
-                isOnline: Boolean(formattedData.is_online)
-            });
-        } catch (err) {
-            console.error('Error creating individual event:', err);
-        }
-      }
+  isGeneratingBatch.value = true;
+  try {
+    const categoryImages = {
+      'Technology': 'https://images.unsplash.com/photo-1518770660439-4636190af475',
+      'Music': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
+      'Design': 'https://images.unsplash.com/photo-1561070791-2526d30994b5',
+      'Business': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf',
+      'Food': 'https://images.unsplash.com/photo-1504674900247-0877df9cc836',
+      'Art': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f',
+      'Personal': 'https://images.unsplash.com/photo-1506863530036-1efeddceb993',
+      'Work': 'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc'
+    };
+    
+    // Get available categories (filter out "All categories")
+    const availableCategories = eventStore.getCategories().filter(c => c !== 'All categories');
+    
+    // Create 10 events
+    for (let i = 0; i < 10; i++) {
+      // Select random category from available categories
+      const category = availableCategories[Math.floor(Math.random() * availableCategories.length)];
+      const isOnline = Math.random() > 0.5;
       
-      renderCharts();
+      // Generate a date between tomorrow and 6 months from now
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
       
-    } catch (error) {
-      console.error('Error generating batch events:', error);
-    } finally {
-      isGeneratingBatch.value = false;
+      const futureDate = new Date();
+      futureDate.setMonth(futureDate.getMonth() + 6);
+      
+      const randomDate = new Date(tomorrow.getTime() + Math.random() * (futureDate.getTime() - tomorrow.getTime()));
+      
+      const newEvent = {
+        title: `Generated ${category} Event ${i + 1}`,
+        description: `This is an automatically generated ${category} event for testing charts and visualizations.`,
+        date: randomDate,
+        location: isOnline ? 'Online' : ['New York', 'San Francisco', 'Chicago', 'Boston', 'Austin'][Math.floor(Math.random() * 5)],
+        category: category,
+        isOnline: isOnline,
+        image: categoryImages[category as keyof typeof categoryImages] || 'https://images.unsplash.com/photo-1523580494863-6f3031224c94' // Fallback image
+      };
+      
+      await eventStore.createEvent(newEvent);
+      
+      // Add a small delay between creating events to prevent overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
-  };
+    
+    // Refresh the data and charts
+    // await refreshData();
+    renderCharts();
+    
+  } catch (error) {
+    console.error('Error generating batch events:', error);
+  } finally {
+    isGeneratingBatch.value = false;
+  }
+};
   
   const toggleRealtimeGeneration = () => {
     eventStore.toggleEventGeneration(!isGenerating.value);
