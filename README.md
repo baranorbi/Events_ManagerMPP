@@ -95,7 +95,7 @@ npm run build
 #### Backend
 For production deployment, consider using:
 ```bash
-daphne -b 0.0.0.0 -p 8000 config.asgi:application
+daphne -b 0.0.0.0 -p 8000 event_manager.asgi:application
 ```
 
 ### API Endpoints

@@ -9,7 +9,10 @@ from .views import (
     ApiRootView,
     FileUploadView,
     ChunkedFileUploadView,
-    FileDownloadView
+    FileDownloadView,
+    EventStatisticsView,
+    CategoryDistributionView,
+    UserEngagementView
 )
 
 urlpatterns = [
@@ -29,6 +32,10 @@ urlpatterns = [
     
     # API root endpoint
     path('', ApiRootView.as_view(), name='api-root'),
+    
+    path('statistics/', EventStatisticsView.as_view(), name='event-statistics'),
+    path('statistics/categories/', CategoryDistributionView.as_view(), name='category-distribution'),
+    path('statistics/engagement/', UserEngagementView.as_view(), name='user-engagement'),
     
     # File upload endpoints
     path('upload/', FileUploadView.as_view(), name='file-upload'),

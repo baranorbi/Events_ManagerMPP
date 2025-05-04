@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import EventSerializer, UserSerializer, AuthSerializer, EventFilterSerializer
 from .database_service import database_service
+from .optimized_queries import OptimizedQueries
 from datetime import datetime
 from django.conf import settings
 from django.http import FileResponse, HttpResponse, HttpResponseNotFound
@@ -319,3 +320,52 @@ class FileDownloadView(APIView):
         response['Content-Length'] = file_size
         
         return response
+
+class EventStatisticsView(APIView):
+    def get(self, request):
+        """Get comprehensive event statistics using optimized queries"""
+        try:
+            statistics = OptimizedQueries.event_statistics()
+            return Response(statistics)
+        except Exception as e:
+            print(f"Error in statistics endpoint: {str(e)}")
+            return Response(
+                {"error": str(e), "message": "Server encountered an error processing statistics"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class CategoryDistributionView(APIView):
+    def get(self, request):
+        """Get distribution of events by category"""
+        try:
+            start_date = request.query_params.get('start_date')
+            end_date = request.query_params.get('end_date')
+            
+            # Convert string dates to datetime objects
+            if start_date:
+                start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+            if end_date:
+                end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+            
+            distribution = OptimizedQueries.event_category_distribution(start_date, end_date)
+            return Response(distribution)
+        except Exception as e:
+            print(f"Error in category distribution endpoint: {str(e)}")
+            return Response(
+                {"error": str(e), "message": "Server encountered an error processing category distribution"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+class UserEngagementView(APIView):
+    def get(self, request):
+        """Get user engagement metrics"""
+        try:
+            limit = int(request.query_params.get('limit', 100))
+            metrics = OptimizedQueries.user_engagement_metrics(limit)
+            return Response(metrics)
+        except Exception as e:
+            print(f"Error in user engagement endpoint: {str(e)}")
+            return Response(
+                {"error": str(e), "message": "Server encountered an error processing user engagement"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
