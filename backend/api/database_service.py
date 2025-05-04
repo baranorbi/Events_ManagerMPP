@@ -2,6 +2,7 @@ from .models import Event, User, UserEvent, InterestedEvent
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from django.db import models
+import uuid
 
 class DatabaseService:
     _instance = None
@@ -22,14 +23,27 @@ class DatabaseService:
             pass
     
     def _seed_sample_data(self):
-        # Create sample user
+        # admin user
+        admin_user = User(
+            id='admin1',
+            name='Admin User',
+            description='Site administrator',
+            avatar='https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=2070&auto=format&fit=crop',
+            email='admin@example.com',
+            password='admin123',
+            role='ADMIN'
+        )
+        admin_user.save()
+        
+        # regular user
         user = User(
             id='user1',
             name='John Doe',
             description='Event enthusiast and organizer',
             avatar='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2070&auto=format&fit=crop',
             email='john@example.com',
-            password='password123'
+            password='password123',
+            role='REGULAR'
         )
         user.save()
         
@@ -277,15 +291,45 @@ class DatabaseService:
         except:
             return False
     
-    def authenticate_user(self, email: str, password: str) -> Optional[Dict]:
+    def get_user_by_email(self, email: str) -> Optional[User]:
         try:
-            # In a real application, you'd use proper password hashing
-            user = User.objects.get(email=email, password=password)
-            return {
+            return User.objects.get(email=email)
+        except User.DoesNotExist:
+            return None
+    
+    def create_user(self, user_data: Dict) -> Optional[Dict]:
+        try:
+            # Create user object
+            user = User(
+                id=user_data.get('id', f"user_{uuid.uuid4().hex[:8]}"),
+                name=user_data.get('name'),
+                description=user_data.get('description', ''),
+                avatar=user_data.get('avatar'),
+                email=user_data.get('email'),
+                password=user_data.get('password'),
+                role=user_data.get('role', 'REGULAR')
+            )
+            user.save()
+            
+            # Return user as dict without password
+            user_dict = {
                 'id': user.id,
                 'name': user.name,
-                'email': user.email
+                'description': user.description,
+                'avatar': user.avatar,
+                'email': user.email,
+                'role': user.role,
+                'created_at': user.created_at
             }
+            return user_dict
+        except Exception as e:
+            print(f"Error creating user: {e}")
+            return None
+    
+    def authenticate_user(self, email: str, password: str) -> Optional[User]:
+        try:
+            user = User.objects.get(email=email, password=password)
+            return user
         except User.DoesNotExist:
             return None
     

@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import Event, User
+from .models import Event, User, UserActivityLog, MonitoredUser
 from datetime import datetime
+import uuid
 
 class EventSerializer(serializers.Serializer):
     id = serializers.CharField(read_only=True)
@@ -35,8 +36,36 @@ class UserSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
     description = serializers.CharField()
     avatar = serializers.URLField(required=False, allow_null=True, allow_blank=True)
-    email = serializers.EmailField(write_only=True, required=False)
-    password = serializers.CharField(write_only=True, required=False)
+    email = serializers.EmailField(required=False)
+    role = serializers.CharField(read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    
+    # Don't include password in regular serialization
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        # Remove password if it exists in the representation
+        ret.pop('password', None)
+        return ret
+
+class UserRegistrationSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    description = serializers.CharField()
+    email = serializers.EmailField()
+    password = serializers.CharField(min_length=6, write_only=True)
+    avatar = serializers.URLField(required=False, allow_null=True, allow_blank=True)
+    
+    def validate_email(self, value):
+        # Check if email already exists
+        from .database_service import database_service
+        if database_service.get_user_by_email(value):
+            raise serializers.ValidationError("A user with this email already exists")
+        return value
+    
+    def create(self, validated_data):
+        # Generate a unique ID for the user
+        validated_data['id'] = f"user_{uuid.uuid4().hex[:8]}"
+        validated_data['role'] = 'REGULAR'
+        return validated_data
 
 class AuthSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -50,4 +79,35 @@ class EventFilterSerializer(serializers.Serializer):
     search = serializers.CharField(required=False, allow_blank=True)
     sort_by = serializers.CharField(required=False, allow_blank=True)
     sort_order = serializers.CharField(required=False, default='asc')
+
+class UserActivityLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = UserActivityLog
+        fields = ['id', 'user', 'user_name', 'action_type', 'entity_type', 'entity_id', 
+                  'details', 'timestamp', 'ip_address']
+    
+    def get_user_name(self, obj):
+        if obj.user:
+            return obj.user.name
+        return None
+
+
+class MonitoredUserSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = MonitoredUser
+        fields = ['id', 'user', 'user_id', 'name', 'email', 'reason', 'detection_time', 'is_active', 'details']
+    
+    def get_user_id(self, obj):
+        return obj.user.id if obj.user else None
+        
+    def get_name(self, obj):
+        return obj.user.name if obj.user else None
+        
+    def get_email(self, obj):
+        return obj.user.email if obj.user else None
 

@@ -124,8 +124,19 @@
           </div>
           <span class="text-xs mt-2 text-[#D9D9D9]">Media</span>
         </router-link>
+        <!-- Admin Dashboard -->
+        <router-link 
+          v-if="isAdmin" 
+          to="/admin" 
+          class="sidebar-item mb-4" 
+          :class="{ 'active': currentRoute === '/admin' }"
+        >
+          <div class="icon-container">
+            <ShieldAlert :size="18" class="text-[#737373]" />
+          </div>
+          <span class="text-xs mt-1 text-[#737373]">Admin</span>
+        </router-link>
       </aside>
-      
       <!-- Main Content -->
       <main class="flex-1 p-6 overflow-auto">
         <slot></slot>
@@ -146,7 +157,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { 
   Layers, Search, X, Home, Zap, User, Shuffle, 
-  BarChart2, WifiOff, ServerCrash, Film 
+  BarChart2, WifiOff, ServerCrash, Film, ShieldAlert 
 } from 'lucide-vue-next';
 import { useEventStore } from '../store/events';
 import { useAuthStore } from '../store/auth';
@@ -167,6 +178,7 @@ const isLoadingRandom = ref(false);
 const isMounted = ref(true);
 
 const isAuthenticated = computed(() => authStore.checkAuth());
+const isAdmin = computed(() => authStore.isAdmin());
 
 const currentRoute = computed(() => {
   return route.path;
