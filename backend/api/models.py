@@ -15,7 +15,13 @@ class Event(models.Model):
     is_online = models.BooleanField(default=False)
 
     class Meta:
-        pass
+        indexes = [
+            models.Index(fields=['date'], name='idx_event_date'),
+            models.Index(fields=['category'], name='idx_event_category'),
+            models.Index(fields=['is_online'], name='idx_event_is_online'),
+            models.Index(fields=['created_by'], name='idx_event_created_by'),
+            models.Index(fields=['date', 'category'], name='idx_event_date_category'),
+        ]
 
 class User(models.Model):
     id = models.CharField(max_length=100, primary_key=True)
@@ -30,6 +36,7 @@ class User(models.Model):
     ], default='REGULAR')
     created_at = models.DateTimeField(auto_now_add=True)
 
+
     class Meta:
         indexes = [
             models.Index(fields=['email'], name='idx_user_email'),
@@ -42,6 +49,9 @@ class UserEvent(models.Model):
 
     class Meta:
         unique_together = ('user', 'event')
+        indexes = [
+            models.Index(fields=['user_id', 'event_id'], name='idx_user_event_composite'),
+        ]
 
 class InterestedEvent(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='interested_events')
@@ -70,7 +80,6 @@ class UserActivityLog(models.Model):
             models.Index(fields=['action_type'], name='idx_activity_action_type'),
             models.Index(fields=['entity_type'], name='idx_activity_entity_type'),
         ]
-
 
 class MonitoredUser(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='monitoring_records')
