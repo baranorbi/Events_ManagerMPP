@@ -3,6 +3,8 @@ import HomePage from '../views/HomePage.vue';
 import TrendingPage from '../views/TrendingPage.vue';
 import ProfilePage from '../views/ProfilePage.vue';
 import ManageEventsPage from '../views/ManageEventsPage.vue';
+import RegisterPage from '../views/RegisterPage.vue';
+import AdminDashboardPage from '../views/AdminDashboardPage.vue';
 import SignInPage from '../views/SignInPage.vue';
 import ChartPage from '../views/ChartPage.vue';
 import MediaPage from '../views/MediaPage.vue';
@@ -32,6 +34,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/admin',
+    name: 'AdminDashboard',
+    component: AdminDashboardPage,
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
     path: '/charts',
     name: 'Charts',
     component: ChartPage
@@ -40,6 +48,11 @@ const routes = [
     path: '/sign-in',
     name: 'SignIn',
     component: SignInPage
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: RegisterPage
   },
   {
     path: '/media',
@@ -60,10 +73,15 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore();
   const isAuthenticated = authStore.checkAuth();
+  const isAdmin = authStore.isAdmin();
   
-  if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
+  if (to.matched.some(record => record.meta.requiresAdmin) && !isAdmin) {
+    next({ name: 'Home' });
+  } else if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
     next({ name: 'SignIn' });
   } else if (to.name === 'SignIn' && isAuthenticated) {
+    next({ name: 'Home' });
+  } else if (to.name === 'Register' && isAuthenticated) {
     next({ name: 'Home' });
   } else {
     next();
