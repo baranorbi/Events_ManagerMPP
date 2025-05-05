@@ -25,7 +25,7 @@ class WebSocketService {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host === 'localhost:5173' ? 'localhost:8000' : window.location.host;
       
-      this.url = `${protocol}//${host}/ws/events/`;
+      this.url = `ws://localhost:8000/ws/events/`;
       
       console.log(`WebSocket connecting to: ${this.url}`); // Debug log
     }
