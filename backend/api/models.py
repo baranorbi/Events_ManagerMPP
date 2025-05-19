@@ -16,12 +16,10 @@ class Event(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['date'], name='idx_event_date'),
-            models.Index(fields=['category'], name='idx_event_category'),
-            models.Index(fields=['is_online'], name='idx_event_is_online'),
-            models.Index(fields=['created_by'], name='idx_event_created_by'),
-            models.Index(fields=['date', 'category'], name='idx_event_date_category'),
+            models.Index(fields=['date']),
+            models.Index(fields=['is_online']),
         ]
+        pass
 
 class User(models.Model):
     id = models.CharField(max_length=100, primary_key=True)

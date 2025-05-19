@@ -1,0 +1,18 @@
+
+services:
+  backend:
+    image: 470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-backend:latest
+    container_name: events-manager-backend
+    environment:
+      - DEBUG=False
+      - DATABASE_URL=postgres://postgres:uNEPAgASa12@events-manager-db.c3s888oim6zp.eu-north-1.rds.amazonaws.com:5432/events_manager_db
+      - CHANNEL_LAYERS_BACKEND=channels_redis.core.RedisChannelLayer
+      - "CHANNEL_LAYERS_CONFIG={\"hosts\": [{\"host\": \"master.events-manager-redis.2opaxk.eun1.cache.amazonaws.com\", \"port\": 6379}]}"
+  
+  frontend:
+    image: 470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-frontend:latest
+    container_name: events-manager-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend

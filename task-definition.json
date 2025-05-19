@@ -1,0 +1,106 @@
+{
+  "family": "events-manager",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "arn:aws:iam::470699572569:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "DEBUG",
+          "value": "False"
+        },
+        {
+          "name": "DATABASE_URL",
+          "value": "postgresql://postgres:uNEPAgASa12@events-manager-db.c3s888oim6zp.eu-north-1.rds.amazonaws.com:5432/events_manager_db"
+        },
+        {
+          "name": "DB_ENGINE",
+          "value": "django.db.backends.postgresql"
+        },
+        {
+          "name": "DB_NAME",
+          "value": "events_manager_db"
+        },
+        {
+          "name": "DB_USER",
+          "value": "postgres"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "value": "uNEPAgASa12"
+        },
+        {
+          "name": "DB_HOST",
+          "value": "events-manager-db.c3s888oim6zp.eu-north-1.rds.amazonaws.com"
+        },
+        {
+          "name": "DB_PORT",
+          "value": "5432"
+        },
+        {
+          "name": "CHANNEL_LAYERS_BACKEND",
+          "value": "channels_redis.core.RedisChannelLayer"
+        },
+        {
+          "name": "CHANNEL_LAYERS_CONFIG",
+          "value": "{\"hosts\": [{\"host\": \"master.events-manager-redis.2opaxk.eun1.cache.amazonaws.com\", \"port\": 6379}]}"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/events-manager",
+          "awslogs-region": "eu-north-1",
+          "awslogs-stream-prefix": "backend"
+        }
+      }
+    },
+    {
+      "name": "frontend",
+      "image": "470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-frontend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 80,
+          "hostPort": 80,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "BACKEND_URL", 
+          "value": "http://localhost:8000"
+        }
+      ],
+      "dependsOn": [
+        {
+          "containerName": "backend",
+          "condition": "START"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/events-manager",
+          "awslogs-region": "eu-north-1",
+          "awslogs-stream-prefix": "frontend"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048"
+}

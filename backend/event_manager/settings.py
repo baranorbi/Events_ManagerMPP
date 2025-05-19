@@ -8,9 +8,43 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-h7f3$%^&*()_+asdfghjkl;qwertyuiop'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = ['*']  # Restrict this in production
 
-ALLOWED_HOSTS = ['*']
+# Database configuration
+# Add or modify this section to use environment variables:
+
+# Database settings
+DATABASES = {
+    'default': {
+        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
+        'NAME': os.environ.get('DB_NAME', os.path.join(BASE_DIR, 'db.sqlite3')),
+        'USER': os.environ.get('DB_USER', ''),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+        'HOST': os.environ.get('DB_HOST', ''),
+        'PORT': os.environ.get('DB_PORT', ''),
+    }
+}
+
+# Try to use DATABASE_URL if available (dj-database-url package required)
+try:
+    import dj_database_url
+    if 'DATABASE_URL' in os.environ:
+        DATABASES['default'] = dj_database_url.config(
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+except ImportError:
+    pass
+
+# Channel layers configuration
+if 'CHANNEL_LAYERS_BACKEND' in os.environ:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': os.environ.get('CHANNEL_LAYERS_BACKEND', 'channels.layers.InMemoryChannelLayer'),
+            'CONFIG': eval(os.environ.get('CHANNEL_LAYERS_CONFIG', '{}')),
+        }
+    }
 
 # Application definition
 INSTALLED_APPS = [
@@ -96,20 +130,6 @@ FILE_UPLOAD_HANDLERS = [
 # Increase the maximum upload size (to 500MB)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # 500MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB - after this Django will use disk
-
-# Use a file-based SQLite database for development
-# This allows migrations to persist between server restarts
-# while still not requiring a full database setup
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'events_manager_db',
-        'USER': 'postgres',
-        'PASSWORD': 'asd',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
 
 # Channels settings
 ASGI_APPLICATION = 'event_manager.asgi.application'
