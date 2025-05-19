@@ -94,12 +94,12 @@ python manage.py migrate
 
 6. (Optional) Populate the database with test data
 ```bash
-python manage.py populate_db --users 100 --events 1000 --registrations 2000 --interested 2000
+python manage.py populate_db --events 10000 --users 100 --batch-size 1000
 ```
 
 7. Start the server using Daphne (for WebSockets support)
 ```bash
-daphne -p 8000 config.asgi:application
+daphne -p 8000 event_manager.asgi:application
 ```
 
 7. The API will be available at ```http://localhost:8000```
