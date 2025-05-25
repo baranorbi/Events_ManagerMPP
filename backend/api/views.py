@@ -282,12 +282,15 @@ class AuthView(APIView):
         serializer = AuthSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                username = serializer.validated_data.get('username')
+                # Change this line - use email instead of username
+                email = serializer.validated_data.get('username')  # Frontend still sends as 'username'
                 password = serializer.validated_data.get('password')
                 
-                # Authenticate user
-                user = User.objects.filter(username=username).first()
-                if not user or not user.check_password(password):
+                # Authenticate user using email
+                user = User.objects.filter(email=email).first()
+                
+                # Direct password comparison instead of check_password()
+                if not user or user.password != password:
                     return Response({
                         'error': 'Invalid credentials'
                     }, status=status.HTTP_401_UNAUTHORIZED)
