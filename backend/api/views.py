@@ -686,7 +686,14 @@ class ValidateTokenView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        return Response({"valid": True})
+        try:
+            # Verify user ID is a number
+            if not isinstance(request.user.id, int):
+                return Response({"error": "Invalid user ID format"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"valid": True})
+        except Exception as e:
+            print(f"Token validation error: {str(e)}")
+            return Response({"error": "Token validation failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TOTPSetupView(APIView):
     permission_classes = [IsAuthenticated]
@@ -716,6 +723,10 @@ class TOTPVerifyView(APIView):
                     # Generate tokens for the user
                     user = User.objects.get(id=user_id)
                     tokens = get_tokens_for_user(user)
+                    
+                    if not tokens:
+                        return Response({'error': 'Failed to generate authentication tokens'}, 
+                                       status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                     
                     return Response({
                         'user': {
