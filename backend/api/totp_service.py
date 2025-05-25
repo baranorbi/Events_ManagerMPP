@@ -9,26 +9,32 @@ class TOTPService:
     @staticmethod
     def get_or_create_device(user_id):
         """Get or create a TOTP device for a user"""
-        user = User.objects.get(id=user_id)
-        
         try:
-            device = TOTPDevice.objects.get(user_id=user_id)
-        except TOTPDevice.DoesNotExist:
-            # Create a new device with a random key
-            key = pyotp.random_base32()
-            device = TOTPDevice.objects.create(
-                user_id=user_id,
-                key=key,
-                enabled=False,
-                last_used_at=datetime.now(timezone.utc)
-            )
-        
-        return device
+            user = User.objects.get(id=user_id)
+            
+            try:
+                device = TOTPDevice.objects.get(user_id=user_id)
+            except TOTPDevice.DoesNotExist:
+                # Create a new device with a random key
+                key = pyotp.random_base32()
+                device = TOTPDevice.objects.create(
+                    user_id=user_id,
+                    key=key,
+                    enabled=False,
+                    last_used_at=datetime.now(timezone.utc)
+                )
+            
+            return device
+        except User.DoesNotExist:
+            return None
     
     @staticmethod
     def generate_qr_code(user_id, issuer_name="Events Manager"):
         """Generate a QR code for TOTP setup"""
         device = TOTPService.get_or_create_device(user_id)
+        if not device:
+            return None
+            
         user = User.objects.get(id=user_id)
         
         # Create a TOTP provisioning URI
