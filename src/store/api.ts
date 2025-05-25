@@ -1,11 +1,8 @@
 import axios from 'axios';
 
-const CLOUDFRONT_DOMAIN = 'd1lre8oyraby8d.cloudfront.net';
-
+// Use relative URLs instead of hardcoded domain
 const api = axios.create({
-  baseURL: import.meta.env.PROD 
-    ? `https://${CLOUDFRONT_DOMAIN}/api`
-    : 'http://127.0.0.1:8000/api',
+  baseURL: '/api', // This will use the current domain
   timeout: 60000,
 });
 

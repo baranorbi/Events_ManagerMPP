@@ -26,24 +26,17 @@ class WebSocketService {
       const isProduction = import.meta.env.PROD;
       const accessToken = localStorage.getItem('access_token');
       
-      if (isProduction) {
-        const cloudFrontDomain = 'd1lre8oyraby8d.cloudfront.net';
-        this.url = `wss://${cloudFrontDomain}/ws/events/`;
-        
-        // Add token to WebSocket URL if available
-        if (accessToken) {
-          this.url += `?token=${accessToken}`;
-        }
-      } else {
-        this.url = `ws://localhost:8000/ws/events/`;
-        
-        // Add token to WebSocket URL if available
-        if (accessToken) {
-          this.url += `?token=${accessToken}`;
-        }
+      // Use the current domain instead of hardcoded CloudFront domain
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      this.url = `${protocol}//${host}/ws/events/`;
+      
+      // Add token to WebSocket URL if available
+      if (accessToken) {
+        this.url += `?token=${accessToken}`;
       }
       
-      console.log(`WebSocket connecting to: ${this.url}`); // Debug log
+      console.log(`WebSocket connecting to: ${this.url}`);
     }
   }
   
@@ -206,8 +199,8 @@ class WebSocketService {
         ? url.split('?token=')[1] 
         : localStorage.getItem('access_token');
     
-    // Create proper API URL for polling
-    const apiBaseUrl = 'https://d1lre8oyraby8d.cloudfront.net/api';
+    // Use current domain instead of hardcoded CloudFront
+    const apiBaseUrl = '/api';
     
     // Start polling every 5 seconds
     this.pollingInterval = setInterval(() => {
