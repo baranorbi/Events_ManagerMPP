@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.views import TokenRefreshView
-from .serializers import EventSerializer, UserSerializer, AuthSerializer, EventFilterSerializer, UserRegistrationSerializer, MonitoredUserSerializer, UserActivityLogSerializer
-from .models import UserActivityLog, MonitoredUser, User
+from .serializers import EventSerializer, UserSerializer, AuthSerializer, EventFilterSerializer, UserRegistrationSerializer, MonitoredUserSerializer, UserActivityLogSerializer, TOTPVerifySerializer, TOTPStatusSerializer
+from .models import UserActivityLog, MonitoredUser, User, TOTPDevice
 from .utils import log_user_activity
 from .database_service import database_service
 from .optimized_queries import OptimizedQueries
@@ -22,6 +22,7 @@ from rest_framework.parsers import FileUploadParser, MultiPartParser
 from wsgiref.util import FileWrapper
 from django.db import models
 from .jwt_utils import get_tokens_for_user
+from .totp_service import totp_service
 
 if not os.path.exists(os.path.join(settings.BASE_DIR, 'media')):
     os.makedirs(os.path.join(settings.BASE_DIR, 'media'))
@@ -282,33 +283,24 @@ class AuthView(APIView):
                 serializer.validated_data['password']
             )
             if user:
-                # Generate tokens with error handling
-                try:
-                    tokens = get_tokens_for_user(user)
-                    
-                    response_data = {
-                        'user': UserSerializer(user).data,
-                        'tokens': tokens
-                    }
-                    return Response(response_data)
-                except Exception as e:
-                    print(f"Token generation error: {str(e)}")
-                    # Fall back to simpler token generation
-                    refresh = RefreshToken()
-                    if isinstance(user, dict):
-                        refresh['user_id'] = user.get('id', '')
-                    else:
-                        refresh['user_id'] = getattr(user, 'id', '')
-                    
-                    response_data = {
-                        'user': UserSerializer(user).data,
-                        'tokens': {
-                            'refresh': str(refresh),
-                            'access': str(refresh.access_token),
-                        }
-                    }
-                    return Response(response_data)
-            
+                # Check if 2FA is enabled for this user
+                is_2fa_enabled = totp_service.is_enabled(user['id'])
+                
+                if is_2fa_enabled:
+                    # Return a partial auth response that requires 2FA verification
+                    return Response({
+                        'requires_2fa': True,
+                        'user_id': user['id']
+                    })
+                
+                # No 2FA, generate tokens and return full response
+                tokens = get_tokens_for_user(user)
+                
+                response_data = {
+                    'user': UserSerializer(user).data,
+                    'tokens': tokens
+                }
+                return Response(response_data)
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -662,3 +654,69 @@ class ValidateTokenView(APIView):
     
     def get(self, request):
         return Response({"valid": True})
+
+class TOTPSetupView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get TOTP setup information with QR code"""
+        user_id = request.user.id
+        
+        # Generate QR code for the user
+        qr_code = totp_service.generate_qr_code(user_id)
+        
+        return Response({
+            'qr_code': qr_code,
+            'is_enabled': totp_service.is_enabled(user_id)
+        })
+
+class TOTPVerifyView(APIView):
+    def post(self, request):
+        """Verify a TOTP token"""
+        serializer = TOTPVerifySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        user_id = serializer.validated_data['user_id']
+        token = serializer.validated_data['token']
+        
+        if totp_service.verify_token(user_id, token):
+            # If verification succeeds, fetch user data and generate JWT tokens
+            user = database_service.get_user_by_id(user_id)
+            
+            if user:
+                # Generate tokens
+                tokens = get_tokens_for_user(user)
+                
+                response_data = {
+                    'user': UserSerializer(user).data,
+                    'tokens': tokens
+                }
+                return Response(response_data)
+                
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        return Response({'error': 'Invalid token'}, status=status.HTTP_401_UNAUTHORIZED)
+
+class TOTPStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Check if TOTP is enabled for the current user"""
+        user_id = request.user.id
+        is_enabled = totp_service.is_enabled(user_id)
+        
+        serializer = TOTPStatusSerializer({'is_enabled': is_enabled})
+        return Response(serializer.data)
+
+class TOTPDisableView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Disable TOTP for the current user"""
+        user_id = request.user.id
+        
+        if totp_service.disable_totp(user_id):
+            return Response({'success': True, 'message': '2FA has been disabled'})
+        
+        return Response({'success': False, 'message': '2FA is not enabled'})

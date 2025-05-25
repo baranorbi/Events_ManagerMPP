@@ -297,6 +297,22 @@ class DatabaseService:
         except User.DoesNotExist:
             return None
     
+    def get_user_by_id(self, user_id):
+        """Get a user by ID"""
+        try:
+            user = User.objects.get(id=user_id)
+            return {
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'description': user.description,
+                'avatar': user.avatar,
+                'role': user.role,
+                'created_at': user.created_at
+            }
+        except User.DoesNotExist:
+            return None
+    
     def create_user(self, user_data: Dict) -> Optional[Dict]:
         try:
             # Create user object

@@ -111,3 +111,10 @@ class MonitoredUserSerializer(serializers.ModelSerializer):
     def get_email(self, obj):
         return obj.user.email if obj.user else None
 
+
+class TOTPVerifySerializer(serializers.Serializer):
+    user_id = serializers.CharField(required=True)
+    token = serializers.CharField(required=True)
+
+class TOTPStatusSerializer(serializers.Serializer):
+    is_enabled = serializers.BooleanField()

@@ -18,7 +18,11 @@ from .views import (
     MonitoredUsersView,
     ActivityLogsView,
     SimulateAttackView,
-    ValidateTokenView
+    ValidateTokenView,
+    TOTPSetupView,
+    TOTPVerifyView,
+    TOTPStatusView,
+    TOTPDisableView
 )
 
 urlpatterns = [
@@ -57,5 +61,11 @@ urlpatterns = [
     path('monitored-users/<int:monitored_id>/dismiss/', MonitoredUsersView.as_view(), name='dismiss-monitored-user'),
     path('activity-logs/', ActivityLogsView.as_view(), name='activity-logs'),
     path('simulate-attack/', SimulateAttackView.as_view(), name='simulate-attack'),
+    
+    # Two-factor authentication endpoints
+    path('2fa/setup/', TOTPSetupView.as_view(), name='totp_setup'),
+    path('2fa/verify/', TOTPVerifyView.as_view(), name='totp_verify'),
+    path('2fa/status/', TOTPStatusView.as_view(), name='totp_status'),
+    path('2fa/disable/', TOTPDisableView.as_view(), name='totp_disable'),
 ]
 

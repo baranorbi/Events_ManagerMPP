@@ -57,6 +57,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'channels',
     'corsheaders',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
     'api',
 ]
 
