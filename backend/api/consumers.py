@@ -8,10 +8,46 @@ import random
 import time
 import threading
 from datetime import datetime, timedelta
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from urllib.parse import parse_qs
+
+class TokenAuthMiddleware:
+    """
+    Custom middleware for authenticating WebSocket connections with JWT tokens
+    """
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        query_string = scope.get('query_string', b'').decode()
+        query_params = parse_qs(query_string)
+        token = query_params.get('token', [None])[0]
+        
+        if token:
+            try:
+                # Verify the token
+                access_token = AccessToken(token)
+                user_id = access_token['user_id']
+                
+                # Add user_id to scope
+                scope['user_id'] = user_id
+            except (InvalidToken, TokenError):
+                # Invalid token, but still process the connection
+                pass
+        
+        return await self.inner(scope, receive, send)
 
 class EventsConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        print(f"WebSocket connection attempt from {self.scope['client']}")
+        # Get user_id from scope (added by TokenAuthMiddleware)
+        self.user_id = self.scope.get('user_id')
+        
+        # You can use the user_id for connection tracking or permissions
+        if self.user_id:
+            print(f"Authenticated WebSocket connection from user {self.user_id}")
+        
+        # Accept the connection
         await self.accept()
         await self.channel_layer.group_add("events_updates", self.channel_name)
         await self.send(text_data=json.dumps({

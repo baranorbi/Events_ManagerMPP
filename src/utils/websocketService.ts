@@ -23,12 +23,23 @@ class WebSocketService {
   constructor(private url: string = '') {
     if (!url) {
       const isProduction = import.meta.env.PROD;
+      const accessToken = localStorage.getItem('access_token');
       
       if (isProduction) {
         const cloudFrontDomain = 'd1lre8oyraby8d.cloudfront.net';
         this.url = `wss://${cloudFrontDomain}/ws/events/`;
+        
+        // Add token to WebSocket URL if available
+        if (accessToken) {
+          this.url += `?token=${accessToken}`;
+        }
       } else {
         this.url = `ws://localhost:8000/ws/events/`;
+        
+        // Add token to WebSocket URL if available
+        if (accessToken) {
+          this.url += `?token=${accessToken}`;
+        }
       }
       
       console.log(`WebSocket connecting to: ${this.url}`); // Debug log

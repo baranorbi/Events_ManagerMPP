@@ -1,6 +1,6 @@
-from django.urls import re_path
-from . import consumers
+from django.urls import path
+from .consumers import EventsConsumer, TokenAuthMiddleware
 
 websocket_urlpatterns = [
-    re_path(r'ws/events/$', consumers.EventsConsumer.as_asgi()),
+    path('ws/events/', TokenAuthMiddleware(EventsConsumer.as_asgi())),
 ]

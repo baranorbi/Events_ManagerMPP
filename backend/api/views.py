@@ -1,6 +1,13 @@
+import os
+import uuid
+import mimetypes
+import random
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.views import TokenRefreshView
 from .serializers import EventSerializer, UserSerializer, AuthSerializer, EventFilterSerializer, UserRegistrationSerializer, MonitoredUserSerializer, UserActivityLogSerializer
 from .models import UserActivityLog, MonitoredUser, User
 from .utils import log_user_activity
@@ -13,11 +20,8 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from rest_framework.parsers import FileUploadParser, MultiPartParser
 from wsgiref.util import FileWrapper
-import os
-import uuid
-import mimetypes
-import random
 from django.db import models
+from .jwt_utils import get_tokens_for_user
 
 if not os.path.exists(os.path.join(settings.BASE_DIR, 'media')):
     os.makedirs(os.path.join(settings.BASE_DIR, 'media'))
@@ -258,8 +262,14 @@ class RegisterView(APIView):
             user_data = serializer.create(serializer.validated_data)
             user = database_service.create_user(user_data)
             if user:
-                # Return user without password
-                return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+                # Generate tokens
+                tokens = get_tokens_for_user(user)
+                
+                response_data = {
+                    'user': UserSerializer(user).data,
+                    'tokens': tokens
+                }
+                return Response(response_data, status=status.HTTP_201_CREATED)
             return Response({'error': 'Failed to create user'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -272,10 +282,20 @@ class AuthView(APIView):
                 serializer.validated_data['password']
             )
             if user:
-                return Response(UserSerializer(user).data)
+                #Generate tokens
+                tokens = get_tokens_for_user(user)
+                
+                response_data = {
+                    'user': UserSerializer(user).data,
+                    'tokens': tokens
+                }
+                return Response(response_data)
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class TokenRefreshView(TokenRefreshView):
+    pass
 
 class ApiRootView(APIView):
     def get(self, request):
@@ -617,3 +637,9 @@ class SimulateAttackView(APIView):
                 'status': 'error',
                 'message': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class ValidateTokenView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        return Response({"valid": True})

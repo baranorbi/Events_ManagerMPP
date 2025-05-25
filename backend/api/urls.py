@@ -17,7 +17,8 @@ from .views import (
     UserEngagementView,
     MonitoredUsersView,
     ActivityLogsView,
-    SimulateAttackView
+    SimulateAttackView,
+    ValidateTokenView
 )
 
 urlpatterns = [
@@ -36,6 +37,7 @@ urlpatterns = [
     # Auth endpoint
     path('auth/', AuthView.as_view(), name='auth'),
     path('register/', RegisterView.as_view(), name='register'),
+    path('users/validate-token/', ValidateTokenView.as_view(), name='validate_token'),
     
     # API root endpoint
     path('', ApiRootView.as_view(), name='api-root'),

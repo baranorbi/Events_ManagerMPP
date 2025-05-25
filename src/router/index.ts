@@ -69,12 +69,25 @@ const router = createRouter({
   routes
 });
 
-// navguard for auth
-router.beforeEach((to, _from, next) => {
+// Add token validation on initial load
+let authInitialized = false;
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
+  
+  // Only run this check once when the app first loads
+  if (!authInitialized && localStorage.getItem('access_token')) {
+    authInitialized = true;
+    try {
+      await authStore.checkTokenValidity();
+    } catch (error) {
+      console.error('Token validation failed');
+    }
+  }
+  
   const isAuthenticated = authStore.checkAuth();
   const isAdmin = authStore.isAdmin();
   
+  // Continue with your existing navguard logic
   if (to.matched.some(record => record.meta.requiresAdmin) && !isAdmin) {
     next({ name: 'Home' });
   } else if (to.matched.some(record => record.meta.requiresAuth) && !isAuthenticated) {
