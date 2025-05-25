@@ -282,32 +282,48 @@ class AuthView(APIView):
                 email = serializer.validated_data['email']
                 password = serializer.validated_data['password']
                 
-                user = database_service.authenticate_user(email, password)
+                # Add error handling for database connection
+                try:
+                    user = database_service.authenticate_user(email, password)
+                except Exception as db_error:
+                    print(f"Database authentication error: {str(db_error)}")
+                    return Response({'error': 'Database connection error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
                 if not user:
                     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
                 
-                # Log user login activity
-                log_user_activity(
-                    user_id=user.id,
-                    action_type='LOGIN',
-                    entity_type='USER',
-                    entity_id=user.id,
-                    ip_address=request.META.get('REMOTE_ADDR', '')
-                )
+                # Add error handling for user activity logging
+                try:
+                    log_user_activity(
+                        user_id=user.id,
+                        action_type='LOGIN',
+                        entity_type='USER',
+                        entity_id=user.id,
+                        ip_address=request.META.get('REMOTE_ADDR', '')
+                    )
+                except Exception as log_error:
+                    print(f"Activity logging error: {str(log_error)}")
+                    # Continue execution even if logging fails
                 
-                # Check if 2FA is enabled for the user
-                has_2fa = totp_service.is_enabled(user.id)
+                # Check if 2FA is enabled for the user with error handling
+                try:
+                    has_2fa = totp_service.is_enabled(user.id)
+                except Exception as totp_error:
+                    print(f"TOTP service error: {str(totp_error)}")
+                    has_2fa = False  # Default to no 2FA if service fails
                 
                 if has_2fa:
-                    # If 2FA is enabled, don't generate tokens yet
                     return Response({
-                        'requires_2fa': True,
-                        'user_id': user.id
-                    })
+                        'user_id': user.id,
+                        'requires_2fa': True
+                    }, status=status.HTTP_200_OK)
                 
-                # Generate JWT tokens
-                tokens = get_tokens_for_user(user)
+                # Generate JWT tokens with error handling
+                try:
+                    tokens = get_tokens_for_user(user)
+                except Exception as token_error:
+                    print(f"Token generation error: {str(token_error)}")
+                    return Response({'error': 'Authentication token error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
                 return Response({
                     'user': {
@@ -319,10 +335,12 @@ class AuthView(APIView):
                     'tokens': tokens
                 })
             except Exception as e:
-                # Log the error
+                # More detailed error logging
+                import traceback
                 print(f"Authentication error: {str(e)}")
+                print(f"Traceback: {traceback.format_exc()}")
                 return Response({'error': 'Authentication failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+    
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class TokenRefreshView(TokenRefreshView):
@@ -698,16 +716,10 @@ class TOTPVerifyView(APIView):
                 user_id = serializer.validated_data['user_id']
                 token = serializer.validated_data['token']
                 
-                # Verify the TOTP token
-                is_valid = totp_service.verify_token(user_id, token)
-                
-                if is_valid:
-                    # Change this line from get_user_by_id to get_user
-                    user = database_service.get_user(user_id)
-                    if not user:
-                        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
-                    
-                    # Generate tokens after successful 2FA
+                # Verify the token
+                if totp_service.verify_token(user_id, token):
+                    # Generate tokens for the user
+                    user = User.objects.get(id=user_id)
                     tokens = get_tokens_for_user(user)
                     
                     return Response({
@@ -717,13 +729,15 @@ class TOTPVerifyView(APIView):
                             'name': user.name,
                             'role': user.role
                         },
-                        'tokens': tokens
+                        'tokens': tokens,
+                        'verified': True
                     })
-                
-                return Response({'error': 'Invalid verification code'}, status=status.HTTP_401_UNAUTHORIZED)
+                else:
+                    return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
+            except User.DoesNotExist:
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
             except Exception as e:
-                # Log the error
-                print(f"2FA verification error: {str(e)}")
+                print(f"TOTP verification error: {str(e)}")
                 return Response({'error': 'Verification failed'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
