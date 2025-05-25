@@ -278,10 +278,48 @@ class AuthView(APIView):
     def post(self, request):
         serializer = AuthSerializer(data=request.data)
         if serializer.is_valid():
+            # Try to get user without database_service dependency
+            try:
+                user = User.objects.get(email=serializer.validated_data['email'])
+                
+                # Check password directly
+                if user.password == serializer.validated_data['password']:
+                    # Convert to dictionary for JWT
+                    user_dict = {
+                        'id': user.id,
+                        'email': user.email,
+                        'name': user.name,
+                        'role': user.role
+                    }
+                    
+                    # Check if 2FA is enabled for this user
+                    is_2fa_enabled = totp_service.is_enabled(user.id)
+                    
+                    if is_2fa_enabled:
+                        # Return partial auth response for 2FA
+                        return Response({
+                            'requires_2fa': True,
+                            'user_id': user.id
+                        })
+                    
+                    # No 2FA, return full auth response
+                    tokens = get_tokens_for_user(user_dict)
+                    
+                    response_data = {
+                        'user': UserSerializer(user).data,
+                        'tokens': tokens
+                    }
+                    return Response(response_data)
+                
+            except User.DoesNotExist:
+                pass
+            
+            # Original database_service approach as fallback
             user = database_service.authenticate_user(
                 serializer.validated_data['email'],
                 serializer.validated_data['password']
             )
+            
             if user:
                 # Check if 2FA is enabled for this user
                 is_2fa_enabled = totp_service.is_enabled(user['id'])
@@ -301,6 +339,7 @@ class AuthView(APIView):
                     'tokens': tokens
                 }
                 return Response(response_data)
+                
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -682,11 +721,19 @@ class TOTPVerifyView(APIView):
         
         if totp_service.verify_token(user_id, token):
             # If verification succeeds, fetch user data and generate JWT tokens
-            user = database_service.get_user_by_id(user_id)
+            user = User.objects.get(id=user_id)
             
             if user:
+                # Convert user model to dict for JWT
+                user_dict = {
+                    'id': user.id,
+                    'email': user.email,
+                    'name': user.name,
+                    'role': user.role
+                }
+                
                 # Generate tokens
-                tokens = get_tokens_for_user(user)
+                tokens = get_tokens_for_user(user_dict)
                 
                 response_data = {
                     'user': UserSerializer(user).data,
