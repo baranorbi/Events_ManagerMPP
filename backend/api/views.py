@@ -282,14 +282,13 @@ class AuthView(APIView):
         serializer = AuthSerializer(data=request.data)
         if serializer.is_valid():
             try:
-                # Change this line - use email instead of username
-                email = serializer.validated_data.get('username')  # Frontend still sends as 'username'
+                email = serializer.validated_data.get('email')
                 password = serializer.validated_data.get('password')
                 
                 # Authenticate user using email
                 user = User.objects.filter(email=email).first()
                 
-                # Direct password comparison instead of check_password()
+                # Direct password comparison
                 if not user or user.password != password:
                     return Response({
                         'error': 'Invalid credentials'
@@ -324,7 +323,7 @@ class AuthView(APIView):
                 return Response({
                     'error': 'Internal server error during authentication'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+    
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class TokenRefreshView(TokenRefreshView):
