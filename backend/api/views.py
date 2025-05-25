@@ -702,8 +702,8 @@ class TOTPVerifyView(APIView):
                 is_valid = totp_service.verify_token(user_id, token)
                 
                 if is_valid:
-                    # Get the user
-                    user = database_service.get_user_by_id(user_id)
+                    # Change this line from get_user_by_id to get_user
+                    user = database_service.get_user(user_id)
                     if not user:
                         return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
                     
