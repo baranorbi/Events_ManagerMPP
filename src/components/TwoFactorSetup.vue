@@ -32,8 +32,8 @@
               ref="otpInput"
               :length="6"
               :input-type="'number'"
-              @on-change="handleChange"
-              @finish="handleComplete"
+              @update:model-value="handleChange"
+              @complete="handleComplete"
             />
           </div>
           
@@ -131,7 +131,7 @@ const verifyAndEnable = async () => {
       is2faEnabled.value = true;
       // Reset the form
       if (otpInput.value) {
-        otpInput.value.clearInput();
+        otpInput.value.reset();
       }
       isComplete.value = false;
     } else {

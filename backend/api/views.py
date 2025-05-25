@@ -719,4 +719,5 @@ class TOTPDisableView(APIView):
         if totp_service.disable_totp(user_id):
             return Response({'success': True, 'message': '2FA has been disabled'})
         
-        return Response({'success': False, 'message': '2FA is not enabled'})
+        return Response({'success': False, 'message': '2FA is not enabled'}, 
+                        status=status.HTTP_400_BAD_REQUEST)

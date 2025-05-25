@@ -8,8 +8,8 @@
         ref="otpInput"
         :length="6"
         :input-type="'number'"
-        @on-change="handleChange"
-        @finish="handleComplete"
+        @update:model-value="handleChange"
+        @complete="handleComplete"
       />
     </div>
     
@@ -76,7 +76,7 @@ const verifyCode = async () => {
       error.value = result.error || 'Verification failed';
       // Reset OTP input on failure
       if (otpInput.value) {
-        otpInput.value.clearInput();
+        otpInput.value.reset();
       }
       isComplete.value = false;
     }
