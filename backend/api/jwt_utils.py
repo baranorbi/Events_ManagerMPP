@@ -10,10 +10,18 @@ def get_tokens_for_user(user):
     # Handle both dict-like objects and model instances
     if isinstance(user, dict):
         user_id = user.get('id')
-        refresh['user_id'] = user_id
+        # Ensure user_id is an integer
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            # If conversion fails, log it but don't store invalid ID
+            print(f"Warning: Invalid user ID format: {user_id}")
+            return None
     else:
         user_id = user.id
-        refresh['user_id'] = user_id
+    
+    # Store user_id in the token
+    refresh['user_id'] = user_id
     
     return {
         'refresh': str(refresh),

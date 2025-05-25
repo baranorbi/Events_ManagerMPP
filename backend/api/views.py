@@ -282,17 +282,13 @@ class AuthView(APIView):
                 email = serializer.validated_data['email']
                 password = serializer.validated_data['password']
                 
-                # Add error handling for database connection
-                try:
-                    user = database_service.authenticate_user(email, password)
-                except Exception as db_error:
-                    print(f"Database authentication error: {str(db_error)}")
-                    return Response({'error': 'Database connection error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # Authenticate user
+                user = database_service.authenticate_user(email, password)
                 
                 if not user:
                     return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
                 
-                # Add error handling for user activity logging
+                # Log user activity
                 try:
                     log_user_activity(
                         user_id=user.id,
@@ -303,28 +299,27 @@ class AuthView(APIView):
                     )
                 except Exception as log_error:
                     print(f"Activity logging error: {str(log_error)}")
-                    # Continue execution even if logging fails
-                
-                # Check if 2FA is enabled for the user with error handling
+                    # Continue even if logging fails
+            
+                # Check if 2FA is enabled
                 try:
                     has_2fa = totp_service.is_enabled(user.id)
                 except Exception as totp_error:
                     print(f"TOTP service error: {str(totp_error)}")
                     has_2fa = False  # Default to no 2FA if service fails
-                
+            
                 if has_2fa:
                     return Response({
                         'user_id': user.id,
                         'requires_2fa': True
                     }, status=status.HTTP_200_OK)
-                
-                # Generate JWT tokens with error handling
-                try:
-                    tokens = get_tokens_for_user(user)
-                except Exception as token_error:
-                    print(f"Token generation error: {str(token_error)}")
-                    return Response({'error': 'Authentication token error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-                
+            
+                # Generate tokens
+                tokens = get_tokens_for_user(user)
+                if not tokens:
+                    return Response({'error': 'Failed to generate authentication tokens'}, 
+                                    status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
                 return Response({
                     'user': {
                         'id': user.id,
@@ -335,7 +330,7 @@ class AuthView(APIView):
                     'tokens': tokens
                 })
             except Exception as e:
-                # More detailed error logging
+                # Log the error with more details
                 import traceback
                 print(f"Authentication error: {str(e)}")
                 print(f"Traceback: {traceback.format_exc()}")
