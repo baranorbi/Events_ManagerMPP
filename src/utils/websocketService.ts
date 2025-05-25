@@ -22,18 +22,13 @@ class WebSocketService {
   
   constructor(private url: string = '') {
     if (!url) {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      let host;
       const isProduction = import.meta.env.PROD;
       
       if (isProduction) {
-        // Use same domain in production (handled by nginx)
-        host = window.location.host;
-        this.url = `${protocol}//${host}/ws/events/`;
+        const cloudFrontDomain = 'd1lre8oyraby8d.cloudfront.net';
+        this.url = `wss://${cloudFrontDomain}/ws/events/`;
       } else {
-        // Development environment handling
-        host = window.location.host === 'localhost:5173' ? 'localhost:8000' : window.location.host;
-        this.url = `${protocol}//${host}/ws/events/`;
+        this.url = `ws://localhost:8000/ws/events/`;
       }
       
       console.log(`WebSocket connecting to: ${this.url}`); // Debug log
