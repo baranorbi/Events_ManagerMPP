@@ -199,38 +199,42 @@ class WebSocketService {
   // Add HTTP polling as fallback
   private initializeHttpPolling(url: string): void {
     console.log('Using HTTP polling instead of WebSockets');
-    this.isConnected.value = true; // Changed from this.connected.value to this.isConnected.value
+    this.isConnected.value = true;
+    
+    // Extract token from URL if present
+    const token = url.includes('?token=') 
+        ? url.split('?token=')[1] 
+        : localStorage.getItem('access_token');
+    
+    // Create proper API URL for polling
+    const apiBaseUrl = 'https://d1lre8oyraby8d.cloudfront.net/api';
     
     // Start polling every 5 seconds
     this.pollingInterval = setInterval(() => {
-        this.pollForUpdates();
-    }, 5000);
-  }
-
-  private async pollForUpdates(): Promise<void> {
-    try {
-        // Use your API to get latest events
-        const response = await fetch('/api/events/recent', {
+        fetch(`${apiBaseUrl}/events/recent`, {
             headers: {
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                'Authorization': `Bearer ${token}`
             }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            if (data && data.events) {
+                data.events.forEach((event: any) => {
+                    this.processMessage(JSON.stringify({
+                        type: 'event_update',
+                        event: event,
+                        action: 'updated'
+                    }));
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Polling error:', error);
         });
-        const data = await response.json();
-        
-        // Process updates
-        if (data && data.events) {
-            data.events.forEach((event: any) => {
-                // Create a MessageEvent-like object or process directly
-                this.processMessage(JSON.stringify({
-                    type: 'event_update',
-                    event: event,
-                    action: 'updated'
-                }));
-            });
-        }
-    } catch (error) {
-        console.error('Polling error:', error);
-    }
+    }, 5000);
 }
 
 private processMessage(messageData: string): void {
