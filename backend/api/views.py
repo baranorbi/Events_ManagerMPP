@@ -315,9 +315,11 @@ class AuthView(APIView):
                     })
                     
             except Exception as e:
+                import traceback
                 print(f"Authentication error: {str(e)}")
+                print(traceback.format_exc())
                 return Response({
-                    'error': 'An error occurred during authentication'
+                    'error': 'Internal server error during authentication'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
