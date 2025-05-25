@@ -9,23 +9,11 @@ def get_tokens_for_user(user):
     
     # Handle both dict-like objects and model instances
     if isinstance(user, dict):
-        # It's a dictionary
-        user_id = user.get('id', '')
-        email = user.get('email', '')
-        name = user.get('name', '')
-        role = user.get('role', 'REGULAR')
+        user_id = user.get('id')
+        refresh['user_id'] = user_id
     else:
-        # Assume it's a model instance
-        user_id = getattr(user, 'id', '')
-        email = getattr(user, 'email', '')
-        name = getattr(user, 'name', '')
-        role = getattr(user, 'role', 'REGULAR')
-    
-    # Add user info to token payload
-    refresh['user_id'] = user_id
-    refresh['email'] = email
-    refresh['name'] = name
-    refresh['role'] = role
+        user_id = user.id
+        refresh['user_id'] = user_id
     
     return {
         'refresh': str(refresh),
