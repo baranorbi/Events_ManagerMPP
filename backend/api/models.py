@@ -43,15 +43,12 @@ class User(models.Model):
 
 class TOTPDevice(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='totp_device')
-    key = models.CharField(max_length=80)
-    confirmed = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    last_used_at = models.DateTimeField(null=True, blank=True)
+    key = models.CharField(max_length=50)
+    enabled = models.BooleanField(default=False)
+    last_used_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        indexes = [
-            models.Index(fields=['user'], name='idx_totp_user'),
-        ]
+        db_table = 'totp_device'
 
 class UserEvent(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='events')

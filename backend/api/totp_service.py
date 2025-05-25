@@ -2,7 +2,6 @@ import pyotp
 import qrcode
 import io
 import base64
-import time
 from datetime import datetime, timezone
 from .models import TOTPDevice, User
 
@@ -13,14 +12,15 @@ class TOTPService:
         user = User.objects.get(id=user_id)
         
         try:
-            device = TOTPDevice.objects.get(user=user)
+            device = TOTPDevice.objects.get(user_id=user_id)
         except TOTPDevice.DoesNotExist:
-            # Create a new TOTP device with a random key
+            # Create a new device with a random key
             key = pyotp.random_base32()
             device = TOTPDevice.objects.create(
-                user=user,
+                user_id=user_id,
                 key=key,
-                confirmed=False
+                enabled=False,
+                last_used_at=datetime.now(timezone.utc)
             )
         
         return device
@@ -58,20 +58,14 @@ class TOTPService:
         try:
             device = TOTPDevice.objects.get(user_id=user_id)
             totp = pyotp.TOTP(device.key)
-            
-            # Verify token
             is_valid = totp.verify(token)
             
-            if is_valid and not device.confirmed:
-                # If this is the first successful verification, mark as confirmed
-                device.confirmed = True
-                device.save()
-            
             if is_valid:
-                # Update last_used_at timestamp
+                # Update the device's last_used_at timestamp and enable it if not already
                 device.last_used_at = datetime.now(timezone.utc)
+                device.enabled = True
                 device.save()
-            
+                
             return is_valid
         except TOTPDevice.DoesNotExist:
             return False
@@ -81,7 +75,8 @@ class TOTPService:
         """Disable TOTP for a user"""
         try:
             device = TOTPDevice.objects.get(user_id=user_id)
-            device.delete()
+            device.enabled = False
+            device.save()
             return True
         except TOTPDevice.DoesNotExist:
             return False
@@ -91,7 +86,7 @@ class TOTPService:
         """Check if TOTP is enabled for a user"""
         try:
             device = TOTPDevice.objects.get(user_id=user_id)
-            return device.confirmed
+            return device.enabled
         except TOTPDevice.DoesNotExist:
             return False
 
