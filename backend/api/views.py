@@ -282,14 +282,33 @@ class AuthView(APIView):
                 serializer.validated_data['password']
             )
             if user:
-                #Generate tokens
-                tokens = get_tokens_for_user(user)
-                
-                response_data = {
-                    'user': UserSerializer(user).data,
-                    'tokens': tokens
-                }
-                return Response(response_data)
+                # Generate tokens with error handling
+                try:
+                    tokens = get_tokens_for_user(user)
+                    
+                    response_data = {
+                        'user': UserSerializer(user).data,
+                        'tokens': tokens
+                    }
+                    return Response(response_data)
+                except Exception as e:
+                    print(f"Token generation error: {str(e)}")
+                    # Fall back to simpler token generation
+                    refresh = RefreshToken()
+                    if isinstance(user, dict):
+                        refresh['user_id'] = user.get('id', '')
+                    else:
+                        refresh['user_id'] = getattr(user, 'id', '')
+                    
+                    response_data = {
+                        'user': UserSerializer(user).data,
+                        'tokens': {
+                            'refresh': str(refresh),
+                            'access': str(refresh.access_token),
+                        }
+                    }
+                    return Response(response_data)
+            
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

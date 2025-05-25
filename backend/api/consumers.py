@@ -20,6 +20,7 @@ class TokenAuthMiddleware:
         self.inner = inner
 
     async def __call__(self, scope, receive, send):
+        # Get token from query string
         query_string = scope.get('query_string', b'').decode()
         query_params = parse_qs(query_string)
         token = query_params.get('token', [None])[0]
@@ -28,13 +29,16 @@ class TokenAuthMiddleware:
             try:
                 # Verify the token
                 access_token = AccessToken(token)
-                user_id = access_token['user_id']
+                user_id = access_token.get('user_id', '')
                 
                 # Add user_id to scope
                 scope['user_id'] = user_id
-            except (InvalidToken, TokenError):
-                # Invalid token, but still process the connection
-                pass
+                print(f"Authenticated WebSocket connection from user {user_id}")
+            except (InvalidToken, TokenError) as e:
+                print(f"Token validation error: {str(e)}")
+                # Invalid token, but we'll still process the connection
+        else:
+            print("No token provided for WebSocket connection")
         
         return await self.inner(scope, receive, send)
 

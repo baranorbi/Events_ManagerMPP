@@ -55,8 +55,21 @@ class WebSocketService {
     this.connectionError.value = null;
     
     try {
-      console.log(`Connecting to WebSocket at ${this.url}`);
-      this.socket = new WebSocket(this.url);
+      // Always get a fresh token when connecting
+      const accessToken = localStorage.getItem('access_token');
+      let url = this.url;
+      
+      // If this is a reconnection, rebuild the URL with the latest token
+      if (!url.includes('?token=') && accessToken) {
+        const baseUrl = import.meta.env.PROD
+          ? `wss://d1lre8oyraby8d.cloudfront.net/ws/events/`
+          : `ws://localhost:8000/ws/events/`;
+          
+        url = `${baseUrl}?token=${accessToken}`;
+      }
+      
+      console.log(`Connecting to WebSocket at ${url}`);
+      this.socket = new WebSocket(url);
       
       this.socket.onopen = this.handleOpen.bind(this);
       this.socket.onmessage = this.handleMessage.bind(this);
