@@ -57,8 +57,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'channels',
     'corsheaders',
-    'django_otp',
-    'django_otp.plugins.otp_totp',
     'api',
 ]
 
@@ -198,9 +196,3 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
-
-# Database configuration debug
-print(f"DEBUG: {DEBUG}")
-print(f"DATABASE_URL: {os.environ.get('DATABASE_URL', 'Not set')}")
-print(f"DB_ENGINE: {os.environ.get('DB_ENGINE', 'Not set')}")
-print(f"Final DATABASES config: {DATABASES}")

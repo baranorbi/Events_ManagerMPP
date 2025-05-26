@@ -9,21 +9,23 @@ def get_tokens_for_user(user):
     
     # Handle both dict-like objects and model instances
     if isinstance(user, dict):
-        user_id = user.get('id')
+        # It's a dictionary
+        user_id = user.get('id', '')
+        email = user.get('email', '')
+        name = user.get('name', '')
+        role = user.get('role', 'REGULAR')
     else:
-        # Handle model instances
-        user_id = getattr(user, 'id', None)
+        # Assume it's a model instance
+        user_id = getattr(user, 'id', '')
+        email = getattr(user, 'email', '')
+        name = getattr(user, 'name', '')
+        role = getattr(user, 'role', 'REGULAR')
     
-    # Ensure user_id is an integer
-    try:
-        user_id = int(user_id)
-    except (TypeError, ValueError):
-        # If conversion fails, log it and return None
-        print(f"Warning: Invalid user ID format: {user_id}")
-        return None
-    
-    # Store user_id in the token
+    # Add user info to token payload
     refresh['user_id'] = user_id
+    refresh['email'] = email
+    refresh['name'] = name
+    refresh['role'] = role
     
     return {
         'refresh': str(refresh),

@@ -9,7 +9,3 @@ redis
 channels_redis
 dj-database-url
 djangorestframework-simplejwt
-django-otp
-qrcode
-Pillow
-pyotp

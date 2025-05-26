@@ -6,7 +6,6 @@ class WebSocketService {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private reconnectTimer: number | null = null;
-  private pollingInterval: number | null = null; // Add this property for HTTP polling
   
   public isConnected = ref(false);
   public isGenerating = ref(false);
@@ -26,58 +25,56 @@ class WebSocketService {
       const isProduction = import.meta.env.PROD;
       const accessToken = localStorage.getItem('access_token');
       
-      // Use the current domain instead of hardcoded CloudFront domain
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      this.url = `${protocol}//${host}/ws/events/`;
-      
-      // Add token to WebSocket URL if available
-      if (accessToken) {
-        this.url += `?token=${accessToken}`;
+      if (isProduction) {
+        const cloudFrontDomain = 'd1lre8oyraby8d.cloudfront.net';
+        this.url = `wss://${cloudFrontDomain}/ws/events/`;
+        
+        // Add token to WebSocket URL if available
+        if (accessToken) {
+          this.url += `?token=${accessToken}`;
+        }
+      } else {
+        this.url = `ws://localhost:8000/ws/events/`;
+        
+        // Add token to WebSocket URL if available
+        if (accessToken) {
+          this.url += `?token=${accessToken}`;
+        }
       }
       
-      console.log(`WebSocket connecting to: ${this.url}`);
+      console.log(`WebSocket connecting to: ${this.url}`); // Debug log
     }
   }
   
   public connect(): void {
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
-        console.log('WebSocket already connected or connecting');
-        return;
+      console.log('WebSocket already connected or connecting');
+      return;
     }
     
     this.connectionError.value = null;
     
     try {
-        // Always get a fresh token when connecting
-        const accessToken = localStorage.getItem('access_token');
-        let url = this.url;
-        
-        // If this is a reconnection, rebuild the URL with the latest token
-        if (!url.includes('?token=') && accessToken) {
-            // Use HTTP fallback if in production (since we can't change CloudFront)
-            const baseUrl = import.meta.env.PROD
-                ? `https://d1lre8oyraby8d.cloudfront.net/api/events/`
-                : `ws://localhost:8000/ws/events/`;
-                
-            url = `${baseUrl}?token=${accessToken}`;
-        }
-        
-        console.log(`Connecting to ${url}`);
-        
-        // In production, use HTTP polling instead of WebSockets
-        if (import.meta.env.PROD) {
-            this.initializeHttpPolling(url);
-            return;
-        }
-        
-        // Only try WebSocket in development
-        this.socket = new WebSocket(url);
-        
-        this.socket.onopen = this.handleOpen.bind(this);
-        this.socket.onmessage = this.handleMessage.bind(this);
-        this.socket.onclose = this.handleClose.bind(this);
-        this.socket.onerror = this.handleError.bind(this);
+      // Always get a fresh token when connecting
+      const accessToken = localStorage.getItem('access_token');
+      let url = this.url;
+      
+      // If this is a reconnection, rebuild the URL with the latest token
+      if (!url.includes('?token=') && accessToken) {
+        const baseUrl = import.meta.env.PROD
+          ? `wss://d1lre8oyraby8d.cloudfront.net/ws/events/`
+          : `ws://localhost:8000/ws/events/`;
+          
+        url = `${baseUrl}?token=${accessToken}`;
+      }
+      
+      console.log(`Connecting to WebSocket at ${url}`);
+      this.socket = new WebSocket(url);
+      
+      this.socket.onopen = this.handleOpen.bind(this);
+      this.socket.onmessage = this.handleMessage.bind(this);
+      this.socket.onclose = this.handleClose.bind(this);
+      this.socket.onerror = this.handleError.bind(this);
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
       this.connectionError.value = 'Failed to create WebSocket connection';
@@ -94,12 +91,6 @@ class WebSocketService {
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
-    }
-    
-    // Clear polling interval if it exists
-    if (this.pollingInterval !== null) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
     }
     
     this.isConnected.value = false;
@@ -144,7 +135,23 @@ class WebSocketService {
   }
   
   private handleMessage(event: MessageEvent): void {
-    this.processMessage(event.data);
+    try {
+      const data = JSON.parse(event.data);
+      console.log('WebSocket message received:', data);
+      this.lastMessage.value = data;
+      
+      // Update generation status if applicable
+      if (data.type === 'generation_status') {
+        this.isGenerating.value = data.status === 'started' || data.status === 'already_running';
+      }
+      
+      // Trigger event based on message type
+      if (data.type && this.eventCallbacks[data.type]) {
+        this.triggerEvent(data.type, data);
+      }
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error);
+    }
   }
   
   private handleClose(event: CloseEvent): void {
@@ -188,64 +195,6 @@ class WebSocketService {
       }
     }
   }
-  
-  // Add HTTP polling as fallback
-  private initializeHttpPolling(url: string): void {
-    console.log('Using HTTP polling instead of WebSockets');
-    this.isConnected.value = true;
-    
-    // Extract token from URL if present
-    const token = url.includes('?token=') 
-        ? url.split('?token=')[1] 
-        : localStorage.getItem('access_token');
-    
-    // Use current domain instead of hardcoded CloudFront
-    const apiBaseUrl = '/api';
-    
-    // Start polling every 5 seconds
-    this.pollingInterval = setInterval(() => {
-        fetch(`${apiBaseUrl}/events/recent`, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        })
-        .then(response => {
-            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-            return response.json();
-        })
-        .then(data => {
-            if (data && data.events) {
-                data.events.forEach((event: any) => {
-                    this.processMessage(JSON.stringify({
-                        type: 'event_update',
-                        event: event,
-                        action: 'updated'
-                    }));
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Polling error:', error);
-        });
-    }, 5000);
-}
-
-private processMessage(messageData: string): void {
-    try {
-        const data = JSON.parse(messageData);
-        console.log('Processing message data:', data);
-        
-        // Update last message
-        this.lastMessage.value = data;
-        
-        // Trigger event based on message type
-        if (data.type && this.eventCallbacks[data.type]) {
-            this.triggerEvent(data.type, data);
-        }
-    } catch (error) {
-        console.error('Error processing message data:', error);
-    }
-}
 }
 
 const websocketService = new WebSocketService();

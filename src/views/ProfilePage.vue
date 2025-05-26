@@ -76,39 +76,6 @@
         @close="showEventDetailsModal = false"
         @removed-from-interested="loadInterestedEvents"
       />
-      
-      <!-- Add 2FA section -->
-      <div class="mt-10 bg-[#232323] rounded-lg p-6 border border-[#333]">
-        <h2 class="text-2xl font-bold mb-4">Security Settings</h2>
-        
-        <div class="mb-4">
-          <h3 class="text-lg font-semibold mb-2">Two-Factor Authentication</h3>
-          <p class="text-gray-400 mb-4">
-            Add an extra layer of security to your account by requiring both your password and authentication code from your mobile device.
-          </p>
-          
-          <button 
-            v-if="!showTwoFactorSetup" 
-            @click="showTwoFactorSetup = true"
-            class="px-4 py-2 bg-[#533673] rounded-md text-white hover:bg-opacity-90 transition-colors"
-          >
-            Manage Two-Factor Authentication
-          </button>
-        </div>
-        
-        <!-- Two-factor setup dialog -->
-        <div v-if="showTwoFactorSetup" class="mt-6 border-t border-[#444] pt-6">
-          <TwoFactorSetup />
-          <div class="mt-4 text-right">
-            <button 
-              @click="showTwoFactorSetup = false"
-              class="px-3 py-1 text-sm text-gray-300 hover:text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   </AppLayout>
 </template>
@@ -119,7 +86,6 @@ import { Image } from 'lucide-vue-next';
 import AppLayout from '../components/AppLayout.vue';
 import EventCard from '../components/EventCard.vue';
 import EventDetailsModal from '../components/EventDetailsModal.vue';
-import TwoFactorSetup from '../components/TwoFactorSetup.vue';
 import { useEventStore } from '../store/events';
 import type { Event, User } from '../types/event';
 
@@ -137,7 +103,6 @@ const selectedEventId = ref('');
 const loading = ref(true);
 const loadingInterested = ref(true);
 const error = ref('');
-const showTwoFactorSetup = ref(false);
 
 onMounted(async () => {
   await loadData();
