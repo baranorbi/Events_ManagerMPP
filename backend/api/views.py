@@ -3,6 +3,7 @@ import uuid
 import mimetypes
 import traceback
 import random
+import shutil
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -280,23 +281,37 @@ class RegisterView(APIView):
 
 class AuthView(APIView):
     def post(self, request):
+        print(f"AuthView received request data: {request.data}")
         serializer = AuthSerializer(data=request.data)
+        print(f"Serializer valid: {serializer.is_valid()}")
+        
         if serializer.is_valid():
             try:
                 email = serializer.validated_data.get('email')
                 password = serializer.validated_data.get('password')
+                print(f"Authenticating user with email: {email}")
                 
                 # Authenticate user using email
                 user = User.objects.filter(email=email).first()
+                print(f"User found: {user is not None}")
                 
-                # Direct password comparison
-                if not user or user.password != password:
+                if not user:
+                    print("User not found")
                     return Response({
                         'error': 'Invalid credentials'
                     }, status=status.HTTP_401_UNAUTHORIZED)
                 
+                # Direct password comparison
+                if user.password != password:
+                    print("Password mismatch")
+                    return Response({
+                        'error': 'Invalid credentials'
+                    }, status=status.HTTP_401_UNAUTHORIZED)
+                
+                print("Password verified, checking TOTP")
                 # Check if TOTP is enabled
                 totp_enabled = totp_service.is_enabled(user.id)
+                print(f"TOTP enabled: {totp_enabled}")
                 
                 if totp_enabled:
                     # Return user_id for 2FA verification
@@ -305,13 +320,16 @@ class AuthView(APIView):
                         'user_id': user.id
                     })
                 else:
+                    print("Generating tokens")
                     # Generate tokens directly if 2FA not required
                     tokens = get_tokens_for_user(user)
                     if not tokens:
+                        print("Failed to generate tokens")
                         return Response({
                             'error': 'Failed to generate authentication tokens'
                         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                     
+                    print("Authentication successful")
                     return Response({
                         'tokens': tokens,
                         'user': UserSerializer(user).data
@@ -324,6 +342,7 @@ class AuthView(APIView):
                     'error': 'Internal server error during authentication'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+        print(f"Serializer errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class TokenRefreshView(TokenRefreshView):
@@ -772,3 +791,20 @@ class TOTPDisableView(APIView):
         
         return Response({'success': False, 'message': '2FA is not enabled'}, 
                         status=status.HTTP_400_BAD_REQUEST)
+
+class HealthCheckView(APIView):
+    def get(self, request):
+        try:
+            # Test database connection
+            user_count = User.objects.count()
+            return Response({
+                'status': 'healthy',
+                'database': 'connected',
+                'user_count': user_count
+            })
+        except Exception as e:
+            return Response({
+                'status': 'unhealthy',
+                'database': 'disconnected',
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
