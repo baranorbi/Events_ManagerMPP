@@ -79,7 +79,7 @@
       "environment": [
         {
           "name": "BACKEND_URL", 
-          "value": "/api"
+          "value": "http://events-manager-alb-1129337473.eu-north-1.elb.amazonaws.com"
         }
       ],
       "dependsOn": [
