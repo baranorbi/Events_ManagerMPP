@@ -22,10 +22,14 @@ from .views import (
     TOTPSetupView,
     TOTPVerifyView,
     TOTPStatusView,
-    TOTPDisableView
+    TOTPDisableView,
+    DebugView  # Add this import
 )
 
 urlpatterns = [
+    # Debug endpoint (add this at the top for easy access)
+    path('debug/', DebugView.as_view(), name='debug'),
+    
     # Event endpoints
     path('events/', EventListView.as_view(), name='event-list'),
     path('events/<str:event_id>/', EventDetailView.as_view(), name='event-detail'),

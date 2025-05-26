@@ -281,69 +281,97 @@ class RegisterView(APIView):
 
 class AuthView(APIView):
     def post(self, request):
-        print(f"AuthView received request data: {request.data}")
-        serializer = AuthSerializer(data=request.data)
-        print(f"Serializer valid: {serializer.is_valid()}")
-        
-        if serializer.is_valid():
-            try:
-                email = serializer.validated_data.get('email')
-                password = serializer.validated_data.get('password')
-                print(f"Authenticating user with email: {email}")
-                
-                # Authenticate user using email
-                user = User.objects.filter(email=email).first()
-                print(f"User found: {user is not None}")
-                
-                if not user:
-                    print("User not found")
-                    return Response({
-                        'error': 'Invalid credentials'
-                    }, status=status.HTTP_401_UNAUTHORIZED)
-                
-                # Direct password comparison
-                if user.password != password:
-                    print("Password mismatch")
-                    return Response({
-                        'error': 'Invalid credentials'
-                    }, status=status.HTTP_401_UNAUTHORIZED)
-                
-                print("Password verified, checking TOTP")
-                # Check if TOTP is enabled
-                totp_enabled = totp_service.is_enabled(user.id)
-                print(f"TOTP enabled: {totp_enabled}")
-                
-                if totp_enabled:
-                    # Return user_id for 2FA verification
-                    return Response({
-                        'requires_2fa': True,
-                        'user_id': user.id
-                    })
-                else:
-                    print("Generating tokens")
-                    # Generate tokens directly if 2FA not required
-                    tokens = get_tokens_for_user(user)
-                    if not tokens:
-                        print("Failed to generate tokens")
+        try:
+            print(f"AuthView received request data: {request.data}")
+            serializer = AuthSerializer(data=request.data)
+            print(f"Serializer valid: {serializer.is_valid()}")
+            
+            if serializer.is_valid():
+                try:
+                    email = serializer.validated_data.get('email')
+                    password = serializer.validated_data.get('password')
+                    print(f"Authenticating user with email: {email}")
+                    
+                    # Test database connection first
+                    try:
+                        user = User.objects.filter(email=email).first()
+                        print(f"User found: {user is not None}")
+                    except Exception as db_error:
+                        print(f"Database error: {str(db_error)}")
                         return Response({
-                            'error': 'Failed to generate authentication tokens'
+                            'error': 'Database connection error'
                         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                     
-                    print("Authentication successful")
-                    return Response({
-                        'tokens': tokens,
-                        'user': UserSerializer(user).data
-                    })
+                    if not user:
+                        print("User not found")
+                        return Response({
+                            'error': 'Invalid credentials'
+                        }, status=status.HTTP_401_UNAUTHORIZED)
                     
-            except Exception as e:
-                print(f"Authentication error: {str(e)}")
-                print(traceback.format_exc())
-                return Response({
-                    'error': 'Internal server error during authentication'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-        print(f"Serializer errors: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                    # Direct password comparison
+                    if user.password != password:
+                        print("Password mismatch")
+                        return Response({
+                            'error': 'Invalid credentials'
+                        }, status=status.HTTP_401_UNAUTHORIZED)
+                    
+                    print("Password verified, checking TOTP")
+                    
+                    # Check if TOTP is enabled
+                    try:
+                        totp_enabled = totp_service.is_enabled(user.id)
+                        print(f"TOTP enabled: {totp_enabled}")
+                    except Exception as totp_error:
+                        print(f"TOTP service error: {str(totp_error)}")
+                        # Continue without 2FA if service is unavailable
+                        totp_enabled = False
+                    
+                    if totp_enabled:
+                        # Return user_id for 2FA verification
+                        return Response({
+                            'requires_2fa': True,
+                            'user_id': user.id
+                        })
+                    else:
+                        print("Generating tokens")
+                        # Generate tokens directly if 2FA not required
+                        try:
+                            tokens = get_tokens_for_user(user)
+                            if not tokens:
+                                print("Failed to generate tokens")
+                                return Response({
+                                    'error': 'Failed to generate authentication tokens'
+                                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                        except Exception as token_error:
+                            print(f"Token generation error: {str(token_error)}")
+                            return Response({
+                                'error': 'Failed to generate authentication tokens'
+                            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                        
+                        print("Authentication successful")
+                        return Response({
+                            'tokens': tokens,
+                            'user': UserSerializer(user).data
+                        })
+                        
+                except Exception as e:
+                    print(f"Authentication inner error: {str(e)}")
+                    import traceback
+                    print(traceback.format_exc())
+                    return Response({
+                        'error': 'Internal server error during authentication'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+            print(f"Serializer errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+        except Exception as e:
+            print(f"AuthView outer error: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return Response({
+                'error': 'Internal server error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class TokenRefreshView(TokenRefreshView):
     pass
@@ -807,4 +835,47 @@ class HealthCheckView(APIView):
                 'status': 'unhealthy',
                 'database': 'disconnected',
                 'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class DebugView(APIView):
+    def get(self, request):
+        try:
+            # Test database connection
+            from django.db import connection
+            cursor = connection.cursor()
+            cursor.execute("SELECT 1")
+            
+            # Test User model
+            user_count = User.objects.count()
+            
+            # Test imports
+            import traceback
+            
+            # Test totp_service
+            totp_service_available = hasattr(totp_service, 'is_enabled')
+            
+            # Test jwt_utils
+            jwt_utils_available = 'get_tokens_for_user' in globals()
+            
+            return Response({
+                'status': 'healthy',
+                'database': 'connected',
+                'user_count': user_count,
+                'imports': {
+                    'traceback': 'ok',
+                    'totp_service': totp_service_available,
+                    'jwt_utils': jwt_utils_available
+                },
+                'django_settings': {
+                    'debug': settings.DEBUG,
+                    'database_engine': settings.DATABASES['default']['ENGINE'],
+                    'database_name': settings.DATABASES['default']['NAME']
+                }
+            })
+        except Exception as e:
+            import traceback
+            return Response({
+                'status': 'error',
+                'error': str(e),
+                'traceback': traceback.format_exc()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
