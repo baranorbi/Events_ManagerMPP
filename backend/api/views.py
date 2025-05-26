@@ -1,6 +1,7 @@
 import os
 import uuid
 import mimetypes
+import traceback
 import random
 from rest_framework import status
 from rest_framework.views import APIView
@@ -317,7 +318,6 @@ class AuthView(APIView):
                     })
                     
             except Exception as e:
-                import traceback
                 print(f"Authentication error: {str(e)}")
                 print(traceback.format_exc())
                 return Response({
@@ -720,7 +720,7 @@ class TOTPVerifyView(APIView):
                 
                 # Verify TOTP token
                 if totp_service.verify_token(user_id, token):
-                    # Generate JWT tokens
+                    # Generate tokens for successful 2FA verification
                     tokens = get_tokens_for_user(user)
                     if not tokens:
                         return Response({
@@ -728,15 +728,13 @@ class TOTPVerifyView(APIView):
                         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                     
                     return Response({
-                        'success': True,
-                        'message': '2FA verification successful',
-                        'tokens': tokens
+                        'tokens': tokens,
+                        'user': UserSerializer(user).data
                     })
                 else:
                     return Response({
-                        'success': False,
-                        'message': 'Invalid verification code'
-                    }, status=status.HTTP_400_BAD_REQUEST)
+                        'error': 'Invalid TOTP token'
+                    }, status=status.HTTP_401_UNAUTHORIZED)
                 
             except User.DoesNotExist:
                 return Response({
@@ -744,8 +742,9 @@ class TOTPVerifyView(APIView):
                 }, status=status.HTTP_404_NOT_FOUND)
             except Exception as e:
                 print(f"TOTP verification error: {str(e)}")
+                print(traceback.format_exc())
                 return Response({
-                    'error': 'An error occurred during verification'
+                    'error': 'Internal server error during TOTP verification'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
