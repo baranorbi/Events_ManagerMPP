@@ -2,7 +2,7 @@ import { ref } from 'vue';
 
 class WebSocketService {
   private socket: WebSocket | null = null;
-  private reconnectInterval: number = 5000; // 5 seconds
+  private reconnectInterval: number = 5000;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private reconnectTimer: number | null = null;
@@ -26,26 +26,34 @@ class WebSocketService {
       const accessToken = localStorage.getItem('access_token');
       
       if (isProduction) {
-        const cloudFrontDomain = 'd1lre8oyraby8d.cloudfront.net';
-        this.url = `wss://${cloudFrontDomain}/ws/events/`;
+        // Check if we're on GitHub Pages or Codespaces
+        const hostname = window.location.hostname;
         
-        // Add token to WebSocket URL if available
-        if (accessToken) {
-          this.url += `?token=${accessToken}`;
+        if (hostname.includes('github.io')) {
+          // GitHub Pages - use environment variable or tunnel URL
+          this.url = import.meta.env.VITE_CODESPACE_WS_URL || 'wss://your-codespace-url.app.github.dev/ws/events/';
+        } else if (hostname.includes('app.github.dev')) {
+          // Direct Codespace access
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const baseHost = hostname;
+          this.url = `${protocol}//${baseHost.replace('-80.', '-8000.')}/ws/events/`;
+        } else {
+          // Other production domains
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const host = window.location.host;
+          this.url = `${protocol}//${host}/ws/events/`;
         }
       } else {
-        this.url = `ws://localhost:8000/ws/events/`;
-        
-        // Add token to WebSocket URL if available
-        if (accessToken) {
-          this.url += `?token=${accessToken}`;
-        }
+        // Development
+        this.url = 'ws://localhost:8000/ws/events/';
       }
       
-      console.log(`WebSocket connecting to: ${this.url}`); // Debug log
+      if (accessToken) {
+        this.url += `?token=${accessToken}`;
+      }
     }
   }
-  
+
   public connect(): void {
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       console.log('WebSocket already connected or connecting');
@@ -55,17 +63,27 @@ class WebSocketService {
     this.connectionError.value = null;
     
     try {
-      // Always get a fresh token when connecting
       const accessToken = localStorage.getItem('access_token');
       let url = this.url;
       
-      // If this is a reconnection, rebuild the URL with the latest token
+      // Rebuild URL with current token if needed
       if (!url.includes('?token=') && accessToken) {
-        const baseUrl = import.meta.env.PROD
-          ? `wss://d1lre8oyraby8d.cloudfront.net/ws/events/`
-          : `ws://localhost:8000/ws/events/`;
-          
-        url = `${baseUrl}?token=${accessToken}`;
+        const hostname = window.location.hostname;
+        let wsUrl = '';
+        
+        if (hostname.includes('app.github.dev')) {
+          // Codespace URL
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const baseHost = hostname;
+          wsUrl = `${protocol}//${baseHost.replace('-80.', '-8000.')}/ws/events/`;
+        } else {
+          // Fallback
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const host = window.location.host;
+          wsUrl = `${protocol}//${host}/ws/events/`;
+        }
+        
+        url = `${wsUrl}?token=${accessToken}`;
       }
       
       console.log(`Connecting to WebSocket at ${url}`);
@@ -81,122 +99,97 @@ class WebSocketService {
       this.scheduleReconnect();
     }
   }
-  
-  public disconnect(): void {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
-    }
-    
-    if (this.reconnectTimer !== null) {
-      window.clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    
-    this.isConnected.value = false;
-    this.reconnectAttempts = 0;
-  }
-  
-  public send(data: any): void {
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(data));
-    } else {
-      console.warn('Cannot send message, WebSocket is not connected');
-      this.connect(); // Try to reconnect
-    }
-  }
-  
-  public startEventGeneration(): void {
-    this.send({ action: 'start_generation' });
-  }
-  
-  public stopEventGeneration(): void {
-    this.send({ action: 'stop_generation' });
-  }
-  
-  public on(event: string, callback: (data: any) => void): void {
-    if (!this.eventCallbacks[event]) {
-      this.eventCallbacks[event] = [];
-    }
-    this.eventCallbacks[event].push(callback);
-  }
-  
-  public off(event: string, callback: (data: any) => void): void {
-    if (this.eventCallbacks[event]) {
-      this.eventCallbacks[event] = this.eventCallbacks[event].filter(cb => cb !== callback);
-    }
-  }
-  
-  private handleOpen(event: Event): void {
-    console.log('WebSocket connection established');
+
+  private handleOpen(): void {
+    console.log('WebSocket connected');
     this.isConnected.value = true;
+    this.connectionError.value = null;
     this.reconnectAttempts = 0;
-    this.triggerEvent('connection_established', { event });
+    
+    this.triggerCallbacks('connection_established', {});
   }
-  
+
   private handleMessage(event: MessageEvent): void {
     try {
       const data = JSON.parse(event.data);
-      console.log('WebSocket message received:', data);
       this.lastMessage.value = data;
       
-      // Update generation status if applicable
-      if (data.type === 'generation_status') {
-        this.isGenerating.value = data.status === 'started' || data.status === 'already_running';
-      }
-      
-      // Trigger event based on message type
       if (data.type && this.eventCallbacks[data.type]) {
-        this.triggerEvent(data.type, data);
+        this.triggerCallbacks(data.type, data);
       }
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
     }
   }
-  
-  private handleClose(event: CloseEvent): void {
-    console.log(`WebSocket connection closed: ${event.code} ${event.reason}`);
+
+  private handleClose(): void {
+    console.log('WebSocket disconnected');
     this.isConnected.value = false;
-    this.triggerEvent('connection_closed', { event });
     this.scheduleReconnect();
+    
+    this.triggerCallbacks('connection_closed', {});
   }
-  
-  private handleError(event: Event): void {
-    console.error('WebSocket error:', event);
+
+  private handleError(error: Event): void {
+    console.error('WebSocket error:', error);
     this.connectionError.value = 'WebSocket connection error';
-    this.triggerEvent('connection_error', { event });
+    
+    this.triggerCallbacks('connection_error', { error });
   }
-  
+
   private scheduleReconnect(): void {
-    if (this.reconnectTimer !== null) {
-      window.clearTimeout(this.reconnectTimer);
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log('Max reconnection attempts reached');
+      return;
     }
     
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      console.log(`Scheduling reconnect attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts} in ${this.reconnectInterval}ms`);
-      this.reconnectTimer = window.setTimeout(() => {
-        this.reconnectAttempts++;
-        this.connect();
-      }, this.reconnectInterval);
-    } else {
-      console.log('Maximum reconnect attempts reached');
-      this.connectionError.value = 'Failed to connect after multiple attempts';
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    
+    this.reconnectTimer = window.setTimeout(() => {
+      console.log(`Attempting to reconnect... (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
+      this.reconnectAttempts++;
+      this.connect();
+    }, this.reconnectInterval);
+  }
+
+  public disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+    
+    this.isConnected.value = false;
+  }
+
+  public on(eventType: string, callback: (data: any) => void): void {
+    if (!this.eventCallbacks[eventType]) {
+      this.eventCallbacks[eventType] = [];
+    }
+    this.eventCallbacks[eventType].push(callback);
+  }
+
+  public off(eventType: string, callback: (data: any) => void): void {
+    if (this.eventCallbacks[eventType]) {
+      const index = this.eventCallbacks[eventType].indexOf(callback);
+      if (index > -1) {
+        this.eventCallbacks[eventType].splice(index, 1);
+      }
     }
   }
-  
-  private triggerEvent(event: string, data: any): void {
-    if (this.eventCallbacks[event]) {
-      for (const callback of this.eventCallbacks[event]) {
-        try {
-          callback(data);
-        } catch (error) {
-          console.error(`Error in WebSocket event callback for ${event}:`, error);
-        }
-      }
+
+  private triggerCallbacks(eventType: string, data: any): void {
+    if (this.eventCallbacks[eventType]) {
+      this.eventCallbacks[eventType].forEach(callback => callback(data));
     }
   }
 }
 
-const websocketService = new WebSocketService();
-
-export default websocketService;
+const webSocketService = new WebSocketService();
+export default webSocketService;

@@ -1,18 +1,45 @@
+version: '3.8'
 
 services:
-  backend:
-    image: 470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-backend:latest
-    container_name: events-manager-backend
-    environment:
-      - DEBUG=False
-      - DATABASE_URL=postgres://postgres:uNEPAgASa12@events-manager-db.c3s888oim6zp.eu-north-1.rds.amazonaws.com:5432/events_manager_db
-      - CHANNEL_LAYERS_BACKEND=channels_redis.core.RedisChannelLayer
-      - "CHANNEL_LAYERS_CONFIG={\"hosts\": [{\"host\": \"master.events-manager-redis.2opaxk.eun1.cache.amazonaws.com\", \"port\": 6379}]}"
-  
   frontend:
-    image: 470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-frontend:latest
-    container_name: events-manager-frontend
+    build: .
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - backend
+    restart: unless-stopped
+    environment:
+      - CLOUDFLARE_DOMAIN=events-managermpp.pages.dev
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend,192.168.1.5,188.27.132.153,events-managermpp.pages.dev,*.pages.dev
+      - CORS_ALLOWED_ORIGINS=https://localhost,https://192.168.1.5,https://188.27.132.153,https://events-managermpp.pages.dev
+      - SECURE_SSL_REDIRECT=False
+      - SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+      - USE_HTTPS=True
+      - CLOUDFLARE_DOMAIN=events-managermpp.pages.dev
+    volumes:
+      - ./backend/media:/app/media
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:

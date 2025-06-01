@@ -1,0 +1,12 @@
+tunnel: events-manager-tunnel
+credentials-file: C:\Users\yes\Desktop\ISS\ionut\Events_ManagerMPP\cloudflare\credentials.json
+
+ingress:
+  # Route your Cloudflare Pages domain to your local HTTPS server
+  - hostname: events-managermpp.pages.dev
+    service: https://localhost:443
+    originRequest:
+      noTLSVerify: true
+      
+  # Catch-all rule (required)
+  - service: http_status:404

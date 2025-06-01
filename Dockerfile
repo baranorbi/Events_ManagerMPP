@@ -18,12 +18,13 @@ FROM nginx:alpine
 # Copy built files to nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy nginx template and script
-COPY nginx.conf /etc/nginx/conf.d/default.conf.template
-COPY start-nginx.sh /start-nginx.sh
-RUN chmod +x /start-nginx.sh
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
+# Create directory for SSL certificates
+RUN mkdir -p /etc/nginx/ssl
 
-# Run the script to replace environment variables in nginx config
-CMD ["/start-nginx.sh"]
+EXPOSE 80 443
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]

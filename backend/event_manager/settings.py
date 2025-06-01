@@ -9,45 +9,37 @@ SECRET_KEY = 'django-insecure-h7f3$%^&*()_+asdfghjkl;qwertyuiop'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = ['*']  # Restrict this in production
 
-# Database configuration
-# Add or modify this section to use environment variables:
+# Updated ALLOWED_HOSTS for Codespaces
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    'backend',
+    '192.168.1.5',
+    '188.27.132.153',
+    'events-managermpp.pages.dev',
+    '*.pages.dev',
+    '*.app.github.dev',  # GitHub Codespaces
+    '*.github.io',       # GitHub Pages
+    '*',  # For Codespaces development - restrict in production
+]
 
-# Database settings
-DATABASES = {
-    'default': {
-        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.environ.get('DB_NAME', os.path.join(BASE_DIR, 'db.sqlite3')),
-        'USER': os.environ.get('DB_USER', ''),
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', ''),
-        'PORT': os.environ.get('DB_PORT', ''),
-    }
-}
+# HTTPS Configuration
+USE_HTTPS = os.environ.get('USE_HTTPS', 'False') == 'True'
 
-# Try to use DATABASE_URL if available (dj-database-url package required)
-try:
-    import dj_database_url
-    if 'DATABASE_URL' in os.environ:
-        DATABASES['default'] = dj_database_url.config(
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
-except ImportError:
-    pass
-
-# Channel layers configuration
-if 'CHANNEL_LAYERS_BACKEND' in os.environ:
-    CHANNEL_LAYERS = {
-        'default': {
-            'BACKEND': os.environ.get('CHANNEL_LAYERS_BACKEND', 'channels.layers.InMemoryChannelLayer'),
-            'CONFIG': eval(os.environ.get('CHANNEL_LAYERS_CONFIG', '{}')),
-        }
-    }
+if USE_HTTPS:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_OPTIONS_NOSNIFF = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 # Application definition
 INSTALLED_APPS = [
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -55,7 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'channels',
+    'rest_framework_simplejwt',
     'corsheaders',
     'api',
 ]
@@ -63,7 +55,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS middleware
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -71,31 +63,51 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# CORS settings
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS settings - Updated for Codespaces
+CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+CORS_ALLOWED_ORIGINS = [
+    "https://localhost",
+    "http://localhost:5173",
+    "https://192.168.1.5",
+    "http://192.168.1.5",
+    "https://188.27.132.153",
+    "https://events-managermpp.pages.dev",
+    "http://events-managermpp.pages.dev",
 ]
 
-# Important for WebSockets
-CORS_ALLOW_CREDENTIALS = True
+# Add Codespace origins dynamically
+if os.environ.get('CODESPACE_NAME'):
+    codespace_name = os.environ.get('CODESPACE_NAME')
+    github_user = os.environ.get('GITHUB_USER', 'user')
+    
+    # Add common Codespace URLs
+    codespace_origins = [
+        f"https://{codespace_name}-80.app.github.dev",
+        f"https://{codespace_name}-443.app.github.dev",
+        f"https://{codespace_name}-5173.app.github.dev",
+        f"https://{codespace_name}-8000.app.github.dev",
+        f"http://{codespace_name}-80.app.github.dev",
+        f"http://{codespace_name}-5173.app.github.dev",
+        f"http://{codespace_name}-8000.app.github.dev",
+    ]
+    
+    CORS_ALLOWED_ORIGINS.extend(codespace_origins)
+    ALLOWED_HOSTS.extend([
+        f"{codespace_name}-80.app.github.dev",
+        f"{codespace_name}-443.app.github.dev",
+        f"{codespace_name}-5173.app.github.dev",
+        f"{codespace_name}-8000.app.github.dev",
+    ])
+
+# Add GitHub Pages domain if available
+github_pages_domain = os.environ.get('GITHUB_PAGES_DOMAIN')
+if github_pages_domain:
+    CORS_ALLOWED_ORIGINS.extend([
+        f"https://{github_pages_domain}",
+        f"http://{github_pages_domain}",
+    ])
+    ALLOWED_HOSTS.append(github_pages_domain)
 
 ROOT_URLCONF = 'event_manager.urls'
 
@@ -117,26 +129,32 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'event_manager.wsgi.application'
 
-# Media files (uploads)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# Configure upload handlers to handle large files
-FILE_UPLOAD_HANDLERS = [
-    'django.core.files.uploadhandler.MemoryFileUploadHandler',
-    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
-]
-
-# Increase the maximum upload size (to 500MB)
-DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # 500MB
-FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB - after this Django will use disk
-
-# Channels settings
-ASGI_APPLICATION = 'event_manager.asgi.application'
-CHANNEL_LAYERS = {
+# Database
+DATABASES = {
     'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
+}
+
+# REST Framework configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20
+}
+
+# JWT Configuration
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
 }
 
 # Password validation
@@ -162,37 +180,34 @@ USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# File upload configuration
+FILE_UPLOAD_HANDLERS = [
+    'django.core.files.uploadhandler.MemoryFileUploadHandler',
+    'django.core.files.uploadhandler.TemporaryFileUploadHandler',
+]
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # 500MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
+
+# Channels settings
+ASGI_APPLICATION = 'event_manager.asgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('redis', 6379)] if not DEBUG else [('localhost', 6379)],
+            "capacity": 1500,
+            "expiry": 10,
+        },
+    },
+}
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# REST Framework settings
-REST_FRAMEWORK = {
-    'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer',
-    ],
-    'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
-    ],
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
-}
-
-from datetime import timedelta
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': False,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
-}

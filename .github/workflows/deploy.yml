@@ -1,43 +1,134 @@
-name: Deploy to AWS
+name: Deploy Events Manager
 
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Generate SSL certificates if not exists
+      run: |
+        $certExists = Test-Path "ssl\cert.pem"
+        $keyExists = Test-Path "ssl\key.pem"
+        
+        if (-not $certExists -or -not $keyExists) {
+          Write-Host "Generating SSL certificates using Docker..." -ForegroundColor Yellow
+          
+          # Create SSL directory
+          New-Item -ItemType Directory -Force -Path "ssl"
+          
+          # Get local IP
+          try {
+            $localIP = Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -ne $null } | Select-Object -First 1 -ExpandProperty IPv4Address | Select-Object -ExpandProperty IPAddress
+            if (-not $localIP) { $localIP = "192.168.1.5" }
+          } catch {
+            $localIP = "192.168.1.5"
+          }
+          
+          # Generate certificates with multiple SANs including IP address
+          docker run --rm -v "${PWD}/ssl:/ssl" alpine/openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /ssl/key.pem -out /ssl/cert.pem -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:$localIP"
+          
+          $certExists = Test-Path "ssl\cert.pem"
+          $keyExists = Test-Path "ssl\key.pem"
+          
+          if ($certExists -and $keyExists) {
+            Write-Host "SSL certificates generated successfully for localhost, 127.0.0.1, and $localIP!" -ForegroundColor Green
+          } else {
+            Write-Host "Failed to generate SSL certificates" -ForegroundColor Red
+            exit 1
+          }
+        } else {
+          Write-Host "SSL certificates already exist" -ForegroundColor Yellow
+        }
+      shell: powershell
       
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-north-1
-      
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      
-      - name: Build and push backend image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: 470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-backend:latest
-      
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: 470699572569.dkr.ecr.eu-north-1.amazonaws.com/events-manager-frontend:latest
-      
-      - name: Force new deployment
-        run: |
-          aws ecs update-service --cluster events-manager-cluster --service events-manager-service --force-new-deployment
+    - name: Stop existing containers
+      run: docker-compose down --remove-orphans
+      continue-on-error: true
+        
+    - name: Clean up old images
+      run: docker system prune -f
+        
+    - name: Build and start services
+      run: docker-compose up --build -d
+        
+    - name: Wait for services to be ready
+      run: |
+        Write-Host "Waiting for services to start..."
+        Start-Sleep -Seconds 40
+        
+        Write-Host "Checking service status..."
+        docker-compose ps
+      shell: powershell
+        
+    - name: Test endpoints
+      run: |
+        # Create SSL bypass for testing
+        add-type @"
+            using System.Net;
+            using System.Security.Cryptography.X509Certificates;
+            public class TrustAllCertsPolicy : ICertificatePolicy {
+                public bool CheckValidationResult(
+                    ServicePoint srvPoint, X509Certificate certificate,
+                    WebRequest request, int certificateProblem) {
+                    return true;
+                }
+            }
+        "@
+        [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+        
+        try {
+          # Test HTTPS frontend
+          $httpsResponse = Invoke-WebRequest -Uri "https://localhost/" -UseBasicParsing -TimeoutSec 30
+          Write-Host "HTTPS Frontend: $($httpsResponse.StatusCode)" -ForegroundColor Green
+        } catch {
+          if ($_.Exception.Response.StatusCode) {
+            Write-Host "HTTPS Frontend: $($_.Exception.Response.StatusCode)" -ForegroundColor Yellow
+          } else {
+            Write-Host "HTTPS Frontend failed: $($_.Exception.Message)" -ForegroundColor Red
+          }
+        }
+        
+        try {
+          # Test API endpoint
+          $apiResponse = Invoke-WebRequest -Uri "https://localhost/api/events/" -UseBasicParsing -TimeoutSec 30
+          Write-Host "API Endpoint: $($apiResponse.StatusCode)" -ForegroundColor Green
+        } catch {
+          if ($_.Exception.Response.StatusCode) {
+            Write-Host "API Endpoint: $($_.Exception.Response.StatusCode)" -ForegroundColor Yellow
+          } else {
+            Write-Host "API Endpoint failed: $($_.Exception.Message)" -ForegroundColor Red
+          }
+        }
+        
+        Write-Host "Deployment completed!" -ForegroundColor Green
+        Write-Host "Local access: https://localhost" -ForegroundColor Yellow
+        
+        # Show public IP if available
+        try {
+          $publicIP = (Invoke-RestMethod -Uri "https://api.ipify.org" -TimeoutSec 10).Trim()
+          Write-Host "Public IP: $publicIP" -ForegroundColor Yellow
+          Write-Host "External access: https://$publicIP (requires port forwarding)" -ForegroundColor Yellow
+        } catch {
+          Write-Host "Could not determine public IP" -ForegroundColor Yellow
+        }
+      shell: powershell
+      continue-on-error: true
+        
+    - name: Show logs if deployment fails
+      if: failure()
+      run: |
+        Write-Host "=== Frontend Logs ===" -ForegroundColor Red
+        docker-compose logs frontend
+        Write-Host "=== Backend Logs ===" -ForegroundColor Red
+        docker-compose logs backend
+        Write-Host "=== Redis Logs ===" -ForegroundColor Red
+        docker-compose logs redis

@@ -1,12 +1,41 @@
 import axios from 'axios';
 
-const CLOUDFRONT_DOMAIN = 'd1lre8oyraby8d.cloudfront.net';
+const getBaseURL = () => {
+  // Check for build-time environment variables first
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8000/api';
+  }
+  
+  // Check if we're running in GitHub Codespaces
+  const hostname = window.location.hostname;
+  
+  if (hostname.includes('app.github.dev')) {
+    // We're in Codespaces - use the current host but port 8000 for API
+    const protocol = window.location.protocol;
+    const baseHost = hostname;
+    return `${protocol}//${baseHost.replace('-80.', '-8000.')}/api`;
+  }
+  
+  // Check if we're on GitHub Pages
+  if (hostname.includes('github.io')) {
+    // Use environment variable or fallback to Codespace URL
+    return import.meta.env.VITE_CODESPACE_API_URL || 'https://your-codespace-url.app.github.dev/api';
+  }
+  
+  // Fallback: use current origin
+  const protocol = window.location.protocol;
+  const host = window.location.host;
+  return `${protocol}//${host}/api`;
+};
 
 const api = axios.create({
-  baseURL: import.meta.env.PROD 
-    ? `https://${CLOUDFRONT_DOMAIN}/api`
-    : '/api',
+  baseURL: getBaseURL(),
   timeout: 60000,
+  withCredentials: true,
 });
 
 api.interceptors.request.use(
@@ -35,27 +64,22 @@ api.interceptors.response.use(
       try {
         const refreshToken = localStorage.getItem('refresh_token');
         if (!refreshToken) {
-          // No refresh token, redirect to login
           window.location.href = '/sign-in';
           return Promise.reject(error);
         }
         
-        // Attempt to refresh the token
         const response = await axios.post(
           `${api.defaults.baseURL}/token/refresh/`,
           { refresh: refreshToken }
         );
         
-        // Store new tokens
         const { access, refresh } = response.data;
         localStorage.setItem('access_token', access);
         localStorage.setItem('refresh_token', refresh);
         
-        // Retry original request with new token
         originalRequest.headers.Authorization = `Bearer ${access}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // If refresh fails, clear tokens and redirect to login
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('auth');
