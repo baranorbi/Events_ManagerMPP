@@ -173,16 +173,23 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
 # Channels settings for WebSockets (Daphne)
 ASGI_APPLICATION = 'event_manager.asgi.application'
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('localhost', 6379)],  # Use localhost in Codespaces
-            "capacity": 1500,
-            "expiry": 10,
+if DEBUG:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [('localhost', 6379)],
+                "capacity": 1500,
+                "expiry": 10,
+            },
+        },
+    }
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
