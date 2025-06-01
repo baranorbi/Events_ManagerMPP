@@ -17,13 +17,13 @@ const getBaseURL = () => {
     // We're in Codespaces - use the current host but port 8000 for API
     const protocol = window.location.protocol;
     const baseHost = hostname;
-    return `${protocol}//${baseHost.replace('-80.', '-8000.')}/api`;
+    return `${protocol}//${baseHost.replace('-5173.', '-8000.')}/api`;
   }
   
   // Check if we're on GitHub Pages
   if (hostname.includes('github.io')) {
-    // Use environment variable or fallback to Codespace URL
-    return import.meta.env.VITE_CODESPACE_API_URL || 'https://your-codespace-url.app.github.dev/api';
+    // Use your actual Codespace URL
+    return 'https://refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev/api';
   }
   
   // Fallback: use current origin

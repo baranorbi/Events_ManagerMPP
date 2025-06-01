@@ -30,13 +30,13 @@ class WebSocketService {
         const hostname = window.location.hostname;
         
         if (hostname.includes('github.io')) {
-          // GitHub Pages - use environment variable or tunnel URL
-          this.url = import.meta.env.VITE_CODESPACE_WS_URL || 'wss://your-codespace-url.app.github.dev/ws/events/';
+          // GitHub Pages - use your actual Codespace URL
+          this.url = 'wss://refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev/ws/events/';
         } else if (hostname.includes('app.github.dev')) {
           // Direct Codespace access
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
           const baseHost = hostname;
-          this.url = `${protocol}//${baseHost.replace('-80.', '-8000.')}/ws/events/`;
+          this.url = `${protocol}//${baseHost.replace('-5173.', '-8000.')}/ws/events/`;
         } else {
           // Other production domains
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -75,7 +75,7 @@ class WebSocketService {
           // Codespace URL
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
           const baseHost = hostname;
-          wsUrl = `${protocol}//${baseHost.replace('-80.', '-8000.')}/ws/events/`;
+          wsUrl = `${protocol}//${baseHost.replace('-5173.', '-8000.')}/ws/events/`;
         } else {
           // Fallback
           const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

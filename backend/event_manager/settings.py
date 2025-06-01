@@ -10,7 +10,7 @@ SECRET_KEY = 'django-insecure-h7f3$%^&*()_+asdfghjkl;qwertyuiop'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# Updated ALLOWED_HOSTS for Codespaces
+# Updated ALLOWED_HOSTS for your specific Codespace
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
@@ -19,7 +19,10 @@ ALLOWED_HOSTS = [
     '188.27.132.153',
     'events-managermpp.pages.dev',
     '*.pages.dev',
-    '*.app.github.dev',  # GitHub Codespaces
+    'refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev',  # Your Codespace backend
+    'refactored-orbit-6rgjx5ggp9rcrg7g-5173.app.github.dev',  # Your Codespace frontend
+    'refactored-orbit-6rgjx5ggp9rcrg7g.github.dev',           # Your base Codespace
+    '*.app.github.dev',  # All GitHub Codespaces
     '*.github.io',       # GitHub Pages
     '*',  # For Codespaces development - restrict in production
 ]
@@ -63,7 +66,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# CORS settings - Updated for Codespaces
+# CORS settings - Updated for your specific Codespace
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all origins in development
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
@@ -74,40 +77,12 @@ CORS_ALLOWED_ORIGINS = [
     "https://188.27.132.153",
     "https://events-managermpp.pages.dev",
     "http://events-managermpp.pages.dev",
+    "https://refactored-orbit-6rgjx5ggp9rcrg7g-5173.app.github.dev",  # Your frontend
+    "https://refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev",  # Your backend
+    "https://refactored-orbit-6rgjx5ggp9rcrg7g.github.dev",           # Your base Codespace
+    "http://refactored-orbit-6rgjx5ggp9rcrg7g-5173.app.github.dev",
+    "http://refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev",
 ]
-
-# Add Codespace origins dynamically
-if os.environ.get('CODESPACE_NAME'):
-    codespace_name = os.environ.get('CODESPACE_NAME')
-    github_user = os.environ.get('GITHUB_USER', 'user')
-    
-    # Add common Codespace URLs
-    codespace_origins = [
-        f"https://{codespace_name}-80.app.github.dev",
-        f"https://{codespace_name}-443.app.github.dev",
-        f"https://{codespace_name}-5173.app.github.dev",
-        f"https://{codespace_name}-8000.app.github.dev",
-        f"http://{codespace_name}-80.app.github.dev",
-        f"http://{codespace_name}-5173.app.github.dev",
-        f"http://{codespace_name}-8000.app.github.dev",
-    ]
-    
-    CORS_ALLOWED_ORIGINS.extend(codespace_origins)
-    ALLOWED_HOSTS.extend([
-        f"{codespace_name}-80.app.github.dev",
-        f"{codespace_name}-443.app.github.dev",
-        f"{codespace_name}-5173.app.github.dev",
-        f"{codespace_name}-8000.app.github.dev",
-    ])
-
-# Add GitHub Pages domain if available
-github_pages_domain = os.environ.get('GITHUB_PAGES_DOMAIN')
-if github_pages_domain:
-    CORS_ALLOWED_ORIGINS.extend([
-        f"https://{github_pages_domain}",
-        f"http://{github_pages_domain}",
-    ])
-    ALLOWED_HOSTS.append(github_pages_domain)
 
 ROOT_URLCONF = 'event_manager.urls'
 
@@ -196,13 +171,13 @@ FILE_UPLOAD_HANDLERS = [
 DATA_UPLOAD_MAX_MEMORY_SIZE = 524288000  # 500MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5MB
 
-# Channels settings
+# Channels settings for WebSockets (Daphne)
 ASGI_APPLICATION = 'event_manager.asgi.application'
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [('redis', 6379)] if not DEBUG else [('localhost', 6379)],
+            "hosts": [('localhost', 6379)],  # Use localhost in Codespaces
             "capacity": 1500,
             "expiry": 10,
         },

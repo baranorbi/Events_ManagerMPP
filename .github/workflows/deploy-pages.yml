@@ -33,9 +33,9 @@ jobs:
       - name: Build for production
         run: npm run build
         env:
-          # Temporary URLs - we'll update these after creating Codespace
-          VITE_API_BASE_URL: https://placeholder-codespace-8000.app.github.dev/api
-          VITE_WS_BASE_URL: wss://placeholder-codespace-8000.app.github.dev/ws/events/
+          # Your actual Codespace URLs
+          VITE_API_BASE_URL: https://refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev/api
+          VITE_WS_BASE_URL: wss://refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev/ws/events/
           
       - name: Setup Pages
         uses: actions/configure-pages@v4
