@@ -6,23 +6,25 @@ const getBaseURL = () => {
     return import.meta.env.VITE_API_BASE_URL;
   }
   
-  if (import.meta.env.DEV) {
-    return 'http://localhost:8000/api';
-  }
-  
   // Check if we're running in GitHub Codespaces
   const hostname = window.location.hostname;
   
   if (hostname.includes('app.github.dev')) {
-    // We're in Codespaces - use the current host but port 8000 for API
+    // We're in Codespaces - extract the base and change port
+    // From: refactored-orbit-6rgjx5ggp9rcrg7g-5173.app.github.dev
+    // To:   refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev
     const protocol = window.location.protocol;
-    const baseHost = hostname;
-    return `${protocol}//${baseHost.replace('-5173.', '-8000.')}/api`;
+    const baseHost = hostname.replace('-5173.', '-8000.');
+    return `${protocol}//${baseHost}/api`;
+  }
+  
+  if (import.meta.env.DEV) {
+    return 'http://localhost:8000/api';
   }
   
   // Check if we're on GitHub Pages
   if (hostname.includes('github.io')) {
-    // Use your actual Codespace URL
+    // Use your actual Codespace URL for GitHub Pages
     return 'https://refactored-orbit-6rgjx5ggp9rcrg7g-8000.app.github.dev/api';
   }
   
@@ -31,6 +33,8 @@ const getBaseURL = () => {
   const host = window.location.host;
   return `${protocol}//${host}/api`;
 };
+
+console.log('API Base URL:', getBaseURL()); // Debug log
 
 const api = axios.create({
   baseURL: getBaseURL(),

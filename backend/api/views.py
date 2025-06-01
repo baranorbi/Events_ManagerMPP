@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.views import TokenRefreshView
 from .serializers import EventSerializer, UserSerializer, AuthSerializer, EventFilterSerializer, UserRegistrationSerializer, MonitoredUserSerializer, UserActivityLogSerializer
 from .models import UserActivityLog, MonitoredUser, User
@@ -255,6 +255,8 @@ class UserDetailView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
@@ -274,6 +276,8 @@ class RegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class AuthView(APIView):
+    permission_classes = [AllowAny]
+    
     def post(self, request):
         serializer = AuthSerializer(data=request.data)
         if serializer.is_valid():
@@ -282,32 +286,33 @@ class AuthView(APIView):
                 serializer.validated_data['password']
             )
             if user:
-                # Generate tokens with error handling
+                # Convert User model instance to dict if needed
+                if hasattr(user, '__dict__'):
+                    user_dict = {
+                        'id': user.id,
+                        'name': user.name,
+                        'email': user.email,
+                        'role': user.role,
+                        'description': getattr(user, 'description', ''),
+                        'avatar': getattr(user, 'avatar', ''),
+                        'created_at': getattr(user, 'created_at', None)
+                    }
+                else:
+                    user_dict = user
+                
                 try:
-                    tokens = get_tokens_for_user(user)
+                    tokens = get_tokens_for_user(user_dict)
                     
                     response_data = {
-                        'user': UserSerializer(user).data,
+                        'user': UserSerializer(user_dict).data,
                         'tokens': tokens
                     }
                     return Response(response_data)
                 except Exception as e:
                     print(f"Token generation error: {str(e)}")
-                    # Fall back to simpler token generation
-                    refresh = RefreshToken()
-                    if isinstance(user, dict):
-                        refresh['user_id'] = user.get('id', '')
-                    else:
-                        refresh['user_id'] = getattr(user, 'id', '')
-                    
-                    response_data = {
-                        'user': UserSerializer(user).data,
-                        'tokens': {
-                            'refresh': str(refresh),
-                            'access': str(refresh.access_token),
-                        }
-                    }
-                    return Response(response_data)
+                    return Response({
+                        'error': f'Token generation failed: {str(e)}'
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         

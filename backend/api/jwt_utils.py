@@ -2,30 +2,28 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 def get_tokens_for_user(user):
     """
-    Generate JWT tokens for a user
-    Works with both dictionary-like objects and model instances
+    Generate JWT tokens for a user (dict or model instance)
     """
     refresh = RefreshToken()
     
-    # Handle both dict-like objects and model instances
+    # Handle both dict and model instance
     if isinstance(user, dict):
-        # It's a dictionary
         user_id = user.get('id', '')
         email = user.get('email', '')
-        name = user.get('name', '')
         role = user.get('role', 'REGULAR')
+        name = user.get('name', '')
     else:
-        # Assume it's a model instance
+        # Model instance
         user_id = getattr(user, 'id', '')
         email = getattr(user, 'email', '')
-        name = getattr(user, 'name', '')
         role = getattr(user, 'role', 'REGULAR')
+        name = getattr(user, 'name', '')
     
-    # Add user info to token payload
-    refresh['user_id'] = user_id
+    # Add custom claims to the token
+    refresh['user_id'] = str(user_id)
     refresh['email'] = email
-    refresh['name'] = name
     refresh['role'] = role
+    refresh['name'] = name
     
     return {
         'refresh': str(refresh),
